@@ -57,6 +57,7 @@ function InvoiceDetail() {
   const outstanding = Math.max(0, Number(inv.total) - effectivePaid);
 
   async function savePayment() {
+    if (!inv) return;
     setSaving(true);
     const paid = amountPaid === "" ? Number(inv.amount_paid) : Number(amountPaid);
     let nextStatus = status || inv.status;
@@ -77,7 +78,7 @@ function InvoiceDetail() {
   }
 
   async function downloadDocx() {
-    if (!inv.docx_path) return toast.error("No DOCX generated (no active template).");
+    if (!inv?.docx_path) return toast.error("No DOCX generated (no active template).");
     try {
       const { url } = await dlFn({ data: { path: inv.docx_path } });
       window.open(url, "_blank");
@@ -85,8 +86,10 @@ function InvoiceDetail() {
   }
 
   async function downloadPdf() {
+    if (!inv) return;
     await generateInvoicePdf(inv);
   }
+
 
   async function deleteInvoice() {
     if (!confirm("Delete this invoice?")) return;
