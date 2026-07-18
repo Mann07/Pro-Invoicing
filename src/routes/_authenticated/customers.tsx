@@ -60,19 +60,19 @@ function CustomersPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Customers</h1>
-          <p className="text-sm text-muted-foreground">Manage customer records and vehicle details.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Vendors</h1>
+          <p className="text-sm text-muted-foreground">Manage vendor records and vehicle details.</p>
         </div>
         <Button onClick={() => { setEditing({ name: "" }); setOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" /> New Customer
+          <Plus className="mr-2 h-4 w-4" /> New Vendor
         </Button>
       </div>
 
-      <Input placeholder="Search customers…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-md" />
+      <Input placeholder="Search vendors…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-md" />
 
       <div className="overflow-hidden rounded-lg border bg-card">
         {isLoading ? <div className="p-6 text-muted-foreground">Loading…</div> :
-          filtered.length === 0 ? <div className="p-8 text-center text-sm text-muted-foreground">No customers yet.</div> :
+          filtered.length === 0 ? <div className="p-8 text-center text-sm text-muted-foreground">No vendors yet.</div> :
           <table className="w-full text-sm">
             <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
               <tr><th className="px-4 py-2">Name</th><th className="px-4 py-2">Vehicle</th><th className="px-4 py-2">Make/Model</th><th className="px-4 py-2">Phone</th><th className="px-4 py-2"></th></tr>
@@ -97,7 +97,7 @@ function CustomersPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editing?.id ? "Edit customer" : "New customer"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing?.id ? "Edit vendor" : "New vendor"}</DialogTitle></DialogHeader>
           {editing && (
             <form onSubmit={save} className="space-y-3">
               <Field label="Name *"><Input required value={editing.name} onChange={(e) => setEditing({ ...editing!, name: e.target.value })} /></Field>

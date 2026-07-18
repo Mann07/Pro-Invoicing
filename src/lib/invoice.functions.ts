@@ -1,17 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { toIndianWordsINR } from "@/lib/format";
 
 const LineItemSchema = z.object({
   description: z.string(),
+  hsn_sac: z.string().optional().nullable(),
   qty: z.number(),
   rate: z.number(),
   amount: z.number(),
 });
 
 const InvoiceInput = z.object({
+  bill_type: z.enum(["dealer", "vendor"]).default("dealer"),
   dealer_id: z.string().uuid().nullable().optional(),
   customer_id: z.string().uuid().nullable().optional(),
+  invoice_number: z.string().optional().nullable(),
   issue_date: z.string(),
   line_items: z.array(LineItemSchema),
   gst_rate: z.number().min(0).max(100),
@@ -32,9 +36,20 @@ export const createInvoice = createServerFn({ method: "POST" })
     const gst_amount = +(subtotal * (data.gst_rate / 100)).toFixed(2);
     const total = +(subtotal + gst_amount).toFixed(2);
 
-    const { data: numberRes, error: numErr } = await supabase.rpc("next_invoice_number");
-    if (numErr) throw new Error(numErr.message);
-    const invoice_number = numberRes as string;
+    // Determine invoice number: user-provided (validated) or dealer-scoped RPC.
+    let invoice_number: string;
+    if (data.invoice_number && data.invoice_number.trim()) {
+      invoice_number = data.invoice_number.trim();
+    } else if (data.dealer_id) {
+      const { data: numberRes, error: numErr } = await supabase
+        .rpc("next_invoice_number_for_dealer", { _dealer_id: data.dealer_id });
+      if (numErr) throw new Error(numErr.message);
+      invoice_number = numberRes as string;
+    } else {
+      const { data: numberRes, error: numErr } = await supabase.rpc("next_invoice_number");
+      if (numErr) throw new Error(numErr.message);
+      invoice_number = numberRes as string;
+    }
 
     // Fetch dealer + customer for template rendering
     const [{ data: dealer }, { data: customer }, { data: tpl }] = await Promise.all([
@@ -43,18 +58,18 @@ export const createInvoice = createServerFn({ method: "POST" })
       supabase.from("invoice_templates").select("*").eq("is_active", true).maybeSingle(),
     ]);
 
+    const amount_in_words = toIndianWordsINR(total);
+
     let docx_path: string | null = null;
-    let template_id: string | null = tpl?.id ?? null;
+    const template_id: string | null = tpl?.id ?? null;
 
     if (tpl) {
-      // Download template
       const { data: file, error: dlErr } = await supabase.storage
         .from("invoice-templates")
         .download(tpl.storage_path);
       if (dlErr) throw new Error(`Template download failed: ${dlErr.message}`);
       const arrayBuf = await file.arrayBuffer();
 
-      // Render using docxtemplater (dynamic import - server only)
       const PizZip = (await import("pizzip")).default;
       const Docxtemplater = (await import("docxtemplater")).default;
 
@@ -62,13 +77,21 @@ export const createInvoice = createServerFn({ method: "POST" })
       const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
       const templateData = {
+        bill_type: data.bill_type,
+        is_dealer_bill: data.bill_type === "dealer",
+        is_vendor_bill: data.bill_type === "vendor",
         invoice_number,
         issue_date: data.issue_date,
-        dealer_name: dealer?.name ?? "",
+        dealer_name: (dealer?.invoice_name || dealer?.name) ?? "",
         dealer_address: dealer?.address ?? "",
         dealer_gstin: dealer?.gstin ?? "",
         dealer_phone: dealer?.phone ?? "",
         dealer_email: dealer?.email ?? "",
+        dealer_contact: dealer?.contact_person ?? "",
+        vendor_name: customer?.name ?? "",
+        vendor_address: customer?.address ?? "",
+        vendor_phone: customer?.phone ?? "",
+        // Legacy aliases for existing templates
         customer_name: customer?.name ?? "",
         customer_address: customer?.address ?? "",
         customer_phone: customer?.phone ?? "",
@@ -77,6 +100,7 @@ export const createInvoice = createServerFn({ method: "POST" })
         items: data.line_items.map((it, i) => ({
           sr: i + 1,
           description: it.description,
+          hsn_sac: it.hsn_sac ?? "",
           qty: it.qty,
           rate: it.rate.toFixed(2),
           amount: it.amount.toFixed(2),
@@ -85,6 +109,7 @@ export const createInvoice = createServerFn({ method: "POST" })
         gst_rate: data.gst_rate.toFixed(2),
         gst_amount: gst_amount.toFixed(2),
         total: total.toFixed(2),
+        amount_in_words,
         notes: data.notes ?? "",
       };
 
@@ -127,6 +152,17 @@ export const createInvoice = createServerFn({ method: "POST" })
     if (insErr) throw new Error(insErr.message);
 
     return inserted;
+  });
+
+/** Preview the next dealer-scoped invoice number without consuming it. */
+export const previewNextInvoiceNumber = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ dealer_id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { data: num, error } = await context.supabase
+      .rpc("next_invoice_number_for_dealer", { _dealer_id: data.dealer_id });
+    if (error) throw new Error(error.message);
+    return { invoice_number: num as string };
   });
 
 /** Get a signed download URL for an invoice DOCX. */

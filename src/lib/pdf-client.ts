@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatINR, formatDate } from "./format";
+import { formatINR, formatDate, toIndianWordsINR } from "./format";
 
 export async function generateInvoicePdf(inv: any) {
   const doc = new jsPDF();
@@ -20,14 +20,14 @@ export async function generateInvoicePdf(inv: any) {
   doc.text(`Date: ${formatDate(inv.issue_date)}`, pageWidth - 14, 38, { align: "right" });
   doc.text(`Status: ${inv.status.toUpperCase()}`, pageWidth - 14, 44, { align: "right" });
 
-  // Dealer & Customer
+  // Dealer & Vendor
   let y = 42;
   doc.setFont("helvetica", "bold");
-  doc.text("From (Dealer):", 14, y);
+  doc.text("Dealer:", 14, y);
   doc.setFont("helvetica", "normal");
   y += 5;
   if (inv.dealers) {
-    doc.text(inv.dealers.name, 14, y); y += 5;
+    doc.text(inv.dealers.invoice_name || inv.dealers.name, 14, y); y += 5;
     if (inv.dealers.gstin) { doc.text(`GSTIN: ${inv.dealers.gstin}`, 14, y); y += 5; }
     if (inv.dealers.address) { doc.text(doc.splitTextToSize(inv.dealers.address, 80), 14, y); y += 5; }
     if (inv.dealers.phone) { doc.text(inv.dealers.phone, 14, y); y += 5; }
@@ -35,7 +35,7 @@ export async function generateInvoicePdf(inv: any) {
 
   let y2 = 42;
   doc.setFont("helvetica", "bold");
-  doc.text("Bill To (Customer):", pageWidth / 2 + 10, y2);
+  doc.text("Vendor:", pageWidth / 2 + 10, y2);
   doc.setFont("helvetica", "normal");
   y2 += 5;
   if (inv.customers) {
@@ -51,10 +51,11 @@ export async function generateInvoicePdf(inv: any) {
   // Items
   autoTable(doc, {
     startY,
-    head: [["#", "Description", "Qty", "Rate", "Amount"]],
+    head: [["#", "Description", "HSN/SAC", "Qty", "Rate", "Amount"]],
     body: (inv.line_items as any[]).map((it, i) => [
       String(i + 1),
       it.description,
+      it.hsn_sac ?? "",
       String(it.qty),
       formatINR(it.rate),
       formatINR(it.amount),
@@ -77,9 +78,18 @@ export async function generateInvoicePdf(inv: any) {
   doc.text(`Paid: ${formatINR(inv.amount_paid)}`, rightX, finalY + 22, { align: "right" });
   doc.text(`Outstanding: ${formatINR(Number(inv.total) - Number(inv.amount_paid))}`, rightX, finalY + 28, { align: "right" });
 
+  // Amount in words spans full width below totals
+  const wordsY = finalY + 38;
+  doc.setFont("helvetica", "bold");
+  doc.text("Amount in words:", 14, wordsY);
+  doc.setFont("helvetica", "italic");
+  const words = toIndianWordsINR(Number(inv.total));
+  doc.text(doc.splitTextToSize(words, pageWidth - 28), 14, wordsY + 5);
+  doc.setFont("helvetica", "normal");
+
   if (inv.notes) {
-    doc.text("Notes:", 14, finalY + 22);
-    doc.text(doc.splitTextToSize(inv.notes, pageWidth - 100), 14, finalY + 28);
+    doc.text("Notes:", 14, wordsY + 20);
+    doc.text(doc.splitTextToSize(inv.notes, pageWidth - 28), 14, wordsY + 26);
   }
 
   doc.save(`${inv.invoice_number}.pdf`);

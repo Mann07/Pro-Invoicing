@@ -79,17 +79,19 @@ function TemplatesPage() {
         </p>
         <div className="mt-3 grid gap-2 text-xs font-mono md:grid-cols-2">
           {[
-            "{invoice_number}", "{issue_date}",
-            "{dealer_name}", "{dealer_gstin}", "{dealer_address}", "{dealer_phone}", "{dealer_email}",
+            "{invoice_number}", "{issue_date}", "{bill_type}",
+            "{dealer_name}", "{dealer_gstin}", "{dealer_address}", "{dealer_phone}", "{dealer_email}", "{dealer_contact}",
+            "{vendor_name}", "{vendor_address}", "{vendor_phone}",
             "{customer_name}", "{customer_address}", "{customer_phone}",
             "{vehicle_reg}", "{vehicle_make_model}",
-            "{subtotal}", "{gst_rate}", "{gst_amount}", "{total}", "{notes}",
+            "{subtotal}", "{gst_rate}", "{gst_amount}", "{total}",
+            "{amount_in_words}", "{notes}",
           ].map((p) => <code key={p} className="rounded bg-muted px-2 py-1">{p}</code>)}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
           Loop over items in a table row using{" "}
           <code className="rounded bg-muted px-1">{"{#items}"}</code> …{" "}
-          <code className="rounded bg-muted px-1">{"{sr} {description} {qty} {rate} {amount}"}</code> …{" "}
+          <code className="rounded bg-muted px-1">{"{sr} {description} {hsn_sac} {qty} {rate} {amount}"}</code> …{" "}
           <code className="rounded bg-muted px-1">{"{/items}"}</code>
         </p>
       </div>

@@ -16,8 +16,17 @@ export const Route = createFileRoute("/_authenticated/dealers")({
 
 type Dealer = {
   id?: string;
-  name: string; gstin?: string | null; address?: string | null;
-  phone?: string | null; email?: string | null; state_code?: string | null;
+  name: string;
+  nickname?: string | null;
+  invoice_name?: string | null;
+  invoice_prefix: string;
+  contact_person?: string | null;
+  gstin?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  state_code?: string | null;
+  notes?: string | null;
 };
 
 function DealersPage() {
@@ -32,14 +41,16 @@ function DealersPage() {
   });
 
   const filtered = data.filter((d: any) =>
-    !q || (d.name + " " + (d.gstin ?? "") + " " + (d.phone ?? "")).toLowerCase().includes(q.toLowerCase())
+    !q || (d.name + " " + (d.nickname ?? "") + " " + (d.invoice_prefix ?? "") + " " + (d.gstin ?? "") + " " + (d.phone ?? ""))
+      .toLowerCase().includes(q.toLowerCase())
   );
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!editing) return;
-    const payload = { ...editing };
-    delete (payload as any).id;
+    if (!editing.invoice_prefix?.trim()) return toast.error("Invoice prefix is required");
+    const payload: any = { ...editing, invoice_prefix: editing.invoice_prefix.trim().toUpperCase() };
+    delete payload.id;
     const res = editing.id
       ? await supabase.from("dealers").update(payload).eq("id", editing.id)
       : await supabase.from("dealers").insert(payload);
@@ -61,9 +72,9 @@ function DealersPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dealers</h1>
-          <p className="text-sm text-muted-foreground">Manage dealer records used on invoices.</p>
+          <p className="text-sm text-muted-foreground">Manage dealers, internal nicknames, and invoice number prefixes.</p>
         </div>
-        <Button onClick={() => { setEditing({ name: "" }); setOpen(true); }}>
+        <Button onClick={() => { setEditing({ name: "", invoice_prefix: "" }); setOpen(true); }}>
           <Plus className="mr-2 h-4 w-4" /> New Dealer
         </Button>
       </div>
@@ -75,15 +86,23 @@ function DealersPage() {
           filtered.length === 0 ? <div className="p-8 text-center text-sm text-muted-foreground">No dealers yet.</div> :
           <table className="w-full text-sm">
             <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
-              <tr><th className="px-4 py-2">Name</th><th className="px-4 py-2">GSTIN</th><th className="px-4 py-2">Phone</th><th className="px-4 py-2">Email</th><th className="px-4 py-2"></th></tr>
+              <tr>
+                <th className="px-4 py-2">Nickname</th>
+                <th className="px-4 py-2">Invoice name</th>
+                <th className="px-4 py-2">Prefix</th>
+                <th className="px-4 py-2">GSTIN</th>
+                <th className="px-4 py-2">Phone</th>
+                <th className="px-4 py-2"></th>
+              </tr>
             </thead>
             <tbody className="divide-y">
               {filtered.map((d: any) => (
                 <tr key={d.id}>
-                  <td className="px-4 py-2 font-medium">{d.name}</td>
+                  <td className="px-4 py-2 font-medium">{d.nickname ?? d.name}</td>
+                  <td className="px-4 py-2">{d.invoice_name ?? d.name}</td>
+                  <td className="px-4 py-2 font-mono text-xs">{d.invoice_prefix}</td>
                   <td className="px-4 py-2">{d.gstin ?? "—"}</td>
                   <td className="px-4 py-2">{d.phone ?? "—"}</td>
-                  <td className="px-4 py-2">{d.email ?? "—"}</td>
                   <td className="px-4 py-2 text-right">
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(d); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" onClick={() => remove(d.id)}><Trash2 className="h-4 w-4" /></Button>
@@ -96,18 +115,63 @@ function DealersPage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing?.id ? "Edit dealer" : "New dealer"}</DialogTitle></DialogHeader>
           {editing && (
             <form onSubmit={save} className="space-y-3">
-              <Field label="Name *"><Input required value={editing.name} onChange={(e) => setEditing({ ...editing!, name: e.target.value })} /></Field>
-              <Field label="GSTIN"><Input value={editing.gstin ?? ""} onChange={(e) => setEditing({ ...editing!, gstin: e.target.value })} /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Phone"><Input value={editing.phone ?? ""} onChange={(e) => setEditing({ ...editing!, phone: e.target.value })} /></Field>
-                <Field label="State code"><Input value={editing.state_code ?? ""} onChange={(e) => setEditing({ ...editing!, state_code: e.target.value })} /></Field>
+                <Field label="Nickname (internal)">
+                  <Input placeholder="e.g. EMI Bombay"
+                    value={editing.nickname ?? ""}
+                    onChange={(e) => setEditing({ ...editing!, nickname: e.target.value })} />
+                </Field>
+                <Field label="Invoice prefix *">
+                  <Input required placeholder="e.g. EMIBM-"
+                    value={editing.invoice_prefix}
+                    onChange={(e) => setEditing({ ...editing!, invoice_prefix: e.target.value.toUpperCase() })} />
+                </Field>
               </div>
-              <Field label="Email"><Input type="email" value={editing.email ?? ""} onChange={(e) => setEditing({ ...editing!, email: e.target.value })} /></Field>
-              <Field label="Address"><Textarea rows={2} value={editing.address ?? ""} onChange={(e) => setEditing({ ...editing!, address: e.target.value })} /></Field>
+              <Field label="Name *">
+                <Input required value={editing.name}
+                  onChange={(e) => setEditing({ ...editing!, name: e.target.value })} />
+              </Field>
+              <Field label="Invoice name (shown on invoice)">
+                <Input placeholder="Legal / display name on invoice"
+                  value={editing.invoice_name ?? ""}
+                  onChange={(e) => setEditing({ ...editing!, invoice_name: e.target.value })} />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Contact person">
+                  <Input value={editing.contact_person ?? ""}
+                    onChange={(e) => setEditing({ ...editing!, contact_person: e.target.value })} />
+                </Field>
+                <Field label="GSTIN">
+                  <Input value={editing.gstin ?? ""}
+                    onChange={(e) => setEditing({ ...editing!, gstin: e.target.value })} />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Phone">
+                  <Input value={editing.phone ?? ""}
+                    onChange={(e) => setEditing({ ...editing!, phone: e.target.value })} />
+                </Field>
+                <Field label="State code">
+                  <Input value={editing.state_code ?? ""}
+                    onChange={(e) => setEditing({ ...editing!, state_code: e.target.value })} />
+                </Field>
+              </div>
+              <Field label="Email">
+                <Input type="email" value={editing.email ?? ""}
+                  onChange={(e) => setEditing({ ...editing!, email: e.target.value })} />
+              </Field>
+              <Field label="Address">
+                <Textarea rows={2} value={editing.address ?? ""}
+                  onChange={(e) => setEditing({ ...editing!, address: e.target.value })} />
+              </Field>
+              <Field label="Internal notes">
+                <Textarea rows={2} value={editing.notes ?? ""}
+                  onChange={(e) => setEditing({ ...editing!, notes: e.target.value })} />
+              </Field>
               <DialogFooter><Button type="submit">Save</Button></DialogFooter>
             </form>
           )}

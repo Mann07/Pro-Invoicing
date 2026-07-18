@@ -21,7 +21,7 @@ const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/invoices/new", label: "New Invoice", icon: PlusCircle },
   { to: "/dealers", label: "Dealers", icon: Users },
-  { to: "/customers", label: "Customers", icon: Car },
+  { to: "/customers", label: "Vendors", icon: Car },
   { to: "/templates", label: "Templates", icon: FileCog },
   { to: "/reports", label: "Reports", icon: BarChart3 },
 ] as const;
@@ -42,7 +42,7 @@ function AuthLayout() {
       <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5 font-semibold">
           <FileText className="h-5 w-5 text-sidebar-primary" />
-          RTO Invoicing
+          Dealer Invoicing
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {nav.map((item) => {
@@ -73,7 +73,7 @@ function AuthLayout() {
       <div className="flex flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b bg-primary px-4 text-primary-foreground md:hidden">
           <Link to="/dashboard" className="inline-flex items-center gap-2 font-semibold">
-            <FileText className="h-5 w-5 text-accent" /> RTO
+            <FileText className="h-5 w-5 text-accent" /> Dealer Invoicing
           </Link>
           <Button size="icon" variant="ghost" onClick={() => setOpen(!open)}
             className="text-primary-foreground hover:bg-white/10">
