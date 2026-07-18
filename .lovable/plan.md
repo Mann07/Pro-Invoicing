@@ -1,36 +1,103 @@
-# Invoice Preview Step
+# Dealer Invoicing — Revision Plan
 
-Add a confirmation preview between filling the new-invoice form and actually creating/storing the invoice, so you can verify fields and totals before a number is assigned and files are generated.
+Rebrand app, restructure invoices around dealer-scoped numbering, add HSN/SAC + amount-in-words, and rename customers → vendors. Existing routes/server functions are extended; no rewrite.
 
-## Flow change
+## 1. Rebrand: "RTO Invoicing" → "Dealer Invoicing"
 
-Current: **Fill form → Create invoice** (assigns number, renders DOCX, stores row) → Detail page with download.
+Update title/description/OG in `src/routes/__root.tsx`, sidebar brand in `_authenticated/route.tsx`, landing hero in `index.tsx`, and auth heading in `auth.tsx`.
 
-New: **Fill form → Preview → Confirm & Create** → Detail page with download.
+## 2. Dealer master — new fields
 
-The "Create invoice" button on `src/routes/_authenticated/invoices.new.tsx` becomes **"Preview invoice"** and opens a full preview instead of calling the server. From the preview the user can either **Back to edit** (returns to the form with all values intact) or **Confirm & create** (runs the existing `createInvoice` server function, then navigates to the detail page).
+Add to `dealers`:
+- `nickname text` — internal tracking label (shown in dealer lists/search, **never** in generated invoices).
+- `invoice_name text` — legal name printed on the invoice (falls back to `name` if blank).
+- `invoice_prefix text not null` — e.g. `EMIBM-`, `KAT-`. Editable.
+- `contact_person text`, `notes text` (spec lists them; cheap to add now).
 
-No invoice number is drawn, no DOCX is rendered, and no row is inserted until the user confirms — matching today's behavior of only committing on submit.
+Update `dealers.tsx` form + table: nickname column visible internally, invoice_name + prefix editable. Search matches nickname too.
 
-## Preview contents
+Server invoice render uses `dealer.invoice_name ?? dealer.name` — nickname never enters the docx payload.
 
-A single on-page preview (modal dialog, mobile-friendly) that mirrors the invoice layout the user already sees on the detail page:
+## 3. Terminology: Customers → Vendors (UI only)
 
-- Dealer block (name, GSTIN, address, phone, email) — resolved from the selected dealer
-- Customer block (name, vehicle reg + make/model, phone, address)
-- Issue date
-- Line items table (#, description, qty, rate, amount)
-- Subtotal, GST rate + amount (or "GST not applied"), Total — all formatted as INR
-- Notes
-- A muted note: "Invoice number will be assigned on confirm."
+Keep the `customers` table + `customer_id` FK; rename in UI only to avoid a destructive migration.
+- Rename `customers.tsx` route file → `vendors.tsx`, update sidebar link and all labels.
+- Short code comment notes the alias.
 
-Actions in the preview footer: **Back to edit**, **Confirm & create** (shows the same busy state as today).
+Invoice creation adds a **Bill Type** toggle: **Dealer** (default, no vendor row shown) or **Vendor** (shows vendor picker; dealer still selected for prefix/numbering).
 
-## Technical notes
+## 4. Dealer-scoped invoice numbering
 
-- Edit only `src/routes/_authenticated/invoices.new.tsx`. No server, schema, or other route changes.
-- Add local state `previewOpen: boolean`. Form `onSubmit` runs the existing validation, then sets `previewOpen = true` instead of calling `createFn`.
-- Move the current `createFn` call into a new `confirmCreate()` handler wired to the preview's confirm button; keep the existing `busy` flag, toast, and navigation to `/invoices/$id`.
-- Resolve dealer/customer objects for display by looking them up in the already-loaded `dealers` and `customers` query results by id — no extra fetches.
-- Render the preview in the existing shadcn `Dialog` component (already used elsewhere in the app) with `max-w-3xl` and internal scroll so it works on mobile.
-- Reuse `formatINR` and `formatDate` from `src/lib/format.ts`.
+Per-dealer sequences derived from the highest existing number for that dealer's prefix. Manual edits push the next suggestion forward.
+
+New RPC `next_invoice_number_for_dealer(_dealer_id uuid)`:
+- Reads dealer's `invoice_prefix`.
+- Finds max numeric suffix among existing invoices `WHERE dealer_id = ? AND invoice_number LIKE prefix || '%'`.
+- Returns `prefix || lpad(max+1, 3, '0')` (3-digit like `EMIBM-025`).
+
+Unique index `(dealer_id, invoice_number)` prevents duplicates. Server insert catches the unique-violation and returns a friendly error; client also does a blur-time uniqueness check.
+
+Old `next_invoice_number()` + `invoice_counters` stay in place (unused) — non-destructive; removable later.
+
+## 5. Invoice creation flow
+
+Rework `invoices.new.tsx`:
+- Step 1: pick Dealer → immediately call RPC and populate an **editable** Invoice Number input.
+- Bill Type toggle (Dealer/Vendor) as above.
+- Line-item row gains **HSN/SAC** input (small, between Description and Qty).
+- **Amount in words** displays under Total (auto-computed) and is included in the preview + docx.
+- Preview + confirm dialog keeps existing shape, with new columns/rows.
+
+## 6. Server function updates
+
+`src/lib/invoice.functions.ts` `createInvoice`:
+- Accept `invoice_number` (required) and `hsn_sac` per line item.
+- Drop server call to `next_invoice_number()`.
+- Compute `amount_in_words` and pass into template data alongside items with `hsn_sac`.
+- Use `dealer.invoice_name ?? dealer.name` in the docx payload (nickname excluded).
+
+Zod: `LineItemSchema` gains `hsn_sac: z.string().optional()`; input gains `invoice_number: z.string()`.
+
+## 7. Invoice detail + PDF
+
+- `invoices.$id.tsx`: add HSN/SAC column, Amount-in-words line under total.
+- `pdf-client.ts`: same additions so the client PDF matches.
+- Templates page: extend placeholder reference with `{hsn_sac}` (inside items loop) and `{amount_in_words}`.
+
+## 8. Amount-in-words helper
+
+Small pure-JS helper `toIndianWordsINR(total)` in `src/lib/format.ts` — Indian lakh/crore grouping, output like `Rupees Eighteen Thousand Four Hundred Only`. Shared by client preview, PDF, and server render.
+
+## 9. Migration (single call)
+
+```sql
+ALTER TABLE public.dealers
+  ADD COLUMN IF NOT EXISTS nickname text,
+  ADD COLUMN IF NOT EXISTS invoice_name text,
+  ADD COLUMN IF NOT EXISTS invoice_prefix text,
+  ADD COLUMN IF NOT EXISTS contact_person text,
+  ADD COLUMN IF NOT EXISTS notes text;
+
+UPDATE public.dealers SET invoice_prefix = 'INV-' WHERE invoice_prefix IS NULL;
+ALTER TABLE public.dealers ALTER COLUMN invoice_prefix SET NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS invoices_dealer_number_unique
+  ON public.invoices (dealer_id, invoice_number);
+
+CREATE OR REPLACE FUNCTION public.next_invoice_number_for_dealer(_dealer_id uuid)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE pfx text; max_n int;
+BEGIN
+  SELECT invoice_prefix INTO pfx FROM public.dealers WHERE id = _dealer_id;
+  IF pfx IS NULL THEN RAISE EXCEPTION 'Dealer not found'; END IF;
+  SELECT COALESCE(MAX(NULLIF(regexp_replace(substring(invoice_number from length(pfx)+1), '\D', '', 'g'), '')::int), 0)
+    INTO max_n
+  FROM public.invoices
+  WHERE dealer_id = _dealer_id AND invoice_number LIKE pfx || '%';
+  RETURN pfx || lpad((max_n + 1)::text, 3, '0');
+END; $$;
+```
+
+## Out of scope this turn
+
+Dealer ledger view, overdue notifications, Business Settings page (logo/signature/bank/UPI QR), Excel report shape changes, edit/duplicate invoice, and server-side DOCX→PDF conversion (client jsPDF stays; true DOCX-fidelity PDF needs LibreOffice which isn't available in the Worker runtime — flagged as next-turn work if you want it).

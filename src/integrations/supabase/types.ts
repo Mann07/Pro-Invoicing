@@ -50,33 +50,48 @@ export type Database = {
       dealers: {
         Row: {
           address: string | null
+          contact_person: string | null
           created_at: string
           email: string | null
           gstin: string | null
           id: string
+          invoice_name: string | null
+          invoice_prefix: string
           name: string
+          nickname: string | null
+          notes: string | null
           phone: string | null
           state_code: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
+          contact_person?: string | null
           created_at?: string
           email?: string | null
           gstin?: string | null
           id?: string
+          invoice_name?: string | null
+          invoice_prefix: string
           name: string
+          nickname?: string | null
+          notes?: string | null
           phone?: string | null
           state_code?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
+          contact_person?: string | null
           created_at?: string
           email?: string | null
           gstin?: string | null
           id?: string
+          invoice_name?: string | null
+          invoice_prefix?: string
           name?: string
+          nickname?: string | null
+          notes?: string | null
           phone?: string | null
           state_code?: string | null
           updated_at?: string
@@ -268,6 +283,10 @@ export type Database = {
         Returns: boolean
       }
       next_invoice_number: { Args: never; Returns: string }
+      next_invoice_number_for_dealer: {
+        Args: { _dealer_id: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "user"
