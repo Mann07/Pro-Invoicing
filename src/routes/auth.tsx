@@ -56,7 +56,7 @@ function AuthPage() {
       <div className="border-b bg-primary text-primary-foreground">
         <div className="mx-auto max-w-6xl px-4 py-4">
           <Link to="/" className="inline-flex items-center gap-2 font-semibold">
-            <FileText className="h-5 w-5 text-accent" /> RTO Invoice Manager
+            <FileText className="h-5 w-5 text-accent" /> Dealer Invoicing
           </Link>
         </div>
       </div>
