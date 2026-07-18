@@ -21,7 +21,7 @@ const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/invoices/new", label: "New Invoice", icon: PlusCircle },
   { to: "/dealers", label: "Dealers", icon: Users },
-  { to: "/customers", label: "Customers", icon: Car },
+  { to: "/customers", label: "Vendors", icon: Car },
   { to: "/templates", label: "Templates", icon: FileCog },
   { to: "/reports", label: "Reports", icon: BarChart3 },
 ] as const;
