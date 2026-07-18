@@ -68,11 +68,11 @@ function CustomersPage() {
         </Button>
       </div>
 
-      <Input placeholder="Search customers…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-md" />
+      <Input placeholder="Search vendors…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-md" />
 
       <div className="overflow-hidden rounded-lg border bg-card">
         {isLoading ? <div className="p-6 text-muted-foreground">Loading…</div> :
-          filtered.length === 0 ? <div className="p-8 text-center text-sm text-muted-foreground">No customers yet.</div> :
+          filtered.length === 0 ? <div className="p-8 text-center text-sm text-muted-foreground">No vendors yet.</div> :
           <table className="w-full text-sm">
             <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
               <tr><th className="px-4 py-2">Name</th><th className="px-4 py-2">Vehicle</th><th className="px-4 py-2">Make/Model</th><th className="px-4 py-2">Phone</th><th className="px-4 py-2"></th></tr>
