@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { getInvoiceDownloadUrl } from "@/lib/invoice.functions";
-import { formatINR, formatDate, todayISO } from "@/lib/format";
+import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
 import { generateInvoicePdf } from "@/lib/pdf-client";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
