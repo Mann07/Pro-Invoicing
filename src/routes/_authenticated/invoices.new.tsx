@@ -39,6 +39,7 @@ function NewInvoice() {
   const [gstRate, setGstRate] = useState<number>(18);
   const [gstEnabled, setGstEnabled] = useState(true);
   const [notes, setNotes] = useState("");
+  const [items, setItems] = useState<Line[]>([{ description: "", qty: 1, rate: 0, amount: 0 }]);
   const [busy, setBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
