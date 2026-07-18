@@ -79,11 +79,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Dealer Invoicing" },
-      { name: "description", content: "Dealer Invoicing — create, track, and manage dealer and vendor invoices with GST, HSN/SAC codes, and Word template rendering." },
+      { name: "description", content: "Pro Invoicing — create, track, and manage dealer and vendor invoices with GST, HSN/SAC codes, and Word template rendering." },
       { property: "og:title", content: "Dealer Invoicing" },
-      { property: "og:description", content: "Create, track, and manage dealer and vendor invoices with GST and HSN/SAC support." },
+      { property: "og:description", content: "Pro Invoicing — create, track, and manage dealer and vendor invoices with GST, HSN/SAC codes, and Word template rendering." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Dealer Invoicing" },
+      { name: "twitter:description", content: "Pro Invoicing — create, track, and manage dealer and vendor invoices with GST, HSN/SAC codes, and Word template rendering." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/bb2cb06b-06b3-4643-b211-2acf61733961" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/bb2cb06b-06b3-4643-b211-2acf61733961" },
     ],
     links: [
       {
