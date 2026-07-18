@@ -146,6 +146,7 @@ function InvoiceDetail() {
           <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
             <tr>
               <th className="px-4 py-2">Description</th>
+              <th className="px-4 py-2">HSN/SAC</th>
               <th className="px-4 py-2 text-right">Qty</th>
               <th className="px-4 py-2 text-right">Rate</th>
               <th className="px-4 py-2 text-right">Amount</th>
@@ -155,6 +156,7 @@ function InvoiceDetail() {
             {(inv.line_items as any[]).map((it, i) => (
               <tr key={i}>
                 <td className="px-4 py-2">{it.description}</td>
+                <td className="px-4 py-2">{it.hsn_sac || "—"}</td>
                 <td className="px-4 py-2 text-right">{it.qty}</td>
                 <td className="px-4 py-2 text-right">{formatINR(it.rate)}</td>
                 <td className="px-4 py-2 text-right">{formatINR(it.amount)}</td>
@@ -171,6 +173,10 @@ function InvoiceDetail() {
             <Row label="Paid" value={formatINR(inv.amount_paid)} />
             <Row label="Outstanding" value={formatINR(Number(inv.total) - Number(inv.amount_paid))} />
           </div>
+        </div>
+        <div className="border-t p-4 text-sm">
+          <span className="font-semibold">Amount in words: </span>
+          <span className="italic text-muted-foreground">{toIndianWordsINR(Number(inv.total))}</span>
         </div>
       </div>
 
