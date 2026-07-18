@@ -39,8 +39,11 @@ function NewInvoice() {
   const [gstRate, setGstRate] = useState<number>(18);
   const [gstEnabled, setGstEnabled] = useState(true);
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<Line[]>([{ description: "", qty: 1, rate: 0, amount: 0 }]);
   const [busy, setBusy] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const dealer = dealers.find((d: any) => d.id === dealerId);
+  const customer = customers.find((c: any) => c.id === customerId);
 
   const subtotal = items.reduce((s, it) => s + (it.amount || 0), 0);
   const gstAmt = gstEnabled ? +(subtotal * (gstRate / 100)).toFixed(2) : 0;
