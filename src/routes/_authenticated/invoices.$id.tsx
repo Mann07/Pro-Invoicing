@@ -129,7 +129,7 @@ function InvoiceDetail() {
             </>
           ) : <span className="text-sm text-muted-foreground">—</span>}
         </InfoCard>
-        <InfoCard title="Customer">
+        <InfoCard title="Vendor">
           {inv.customers ? (
             <>
               <div className="font-medium">{inv.customers.name}</div>
