@@ -42,7 +42,7 @@ function AuthLayout() {
       <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5 font-semibold">
           <FileText className="h-5 w-5 text-sidebar-primary" />
-          RTO Invoicing
+          Dealer Invoicing
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {nav.map((item) => {
