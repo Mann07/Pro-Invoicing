@@ -59,11 +59,15 @@ function NewInvoice() {
     }));
   }
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     if (items.length === 0 || items.some((i) => !i.description)) {
       return toast.error("Add at least one line item with description");
     }
+    setPreviewOpen(true);
+  }
+
+  async function confirmCreate() {
     setBusy(true);
     try {
       const res = await createFn({
