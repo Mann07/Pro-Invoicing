@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { createInvoice } from "@/lib/invoice.functions";
-import { formatINR, todayISO } from "@/lib/format";
+import { formatINR, formatDate, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/invoices/new")({
   component: NewInvoice,
@@ -40,6 +41,10 @@ function NewInvoice() {
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<Line[]>([{ description: "", qty: 1, rate: 0, amount: 0 }]);
   const [busy, setBusy] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const dealer = dealers.find((d: any) => d.id === dealerId);
+  const customer = customers.find((c: any) => c.id === customerId);
 
   const subtotal = items.reduce((s, it) => s + (it.amount || 0), 0);
   const gstAmt = gstEnabled ? +(subtotal * (gstRate / 100)).toFixed(2) : 0;
@@ -54,11 +59,15 @@ function NewInvoice() {
     }));
   }
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     if (items.length === 0 || items.some((i) => !i.description)) {
       return toast.error("Add at least one line item with description");
     }
+    setPreviewOpen(true);
+  }
+
+  async function confirmCreate() {
     setBusy(true);
     try {
       const res = await createFn({
@@ -171,8 +180,92 @@ function NewInvoice() {
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={() => navigate({ to: "/dashboard" })}>Cancel</Button>
-        <Button type="submit" disabled={busy}>{busy ? "Creating…" : "Create invoice"}</Button>
+        <Button type="submit">Preview invoice</Button>
       </div>
+
+      <Dialog open={previewOpen} onOpenChange={(o) => !busy && setPreviewOpen(o)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Invoice preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 text-sm">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="mb-1 font-semibold">From (Dealer)</div>
+                {dealer ? (
+                  <div className="space-y-0.5 text-muted-foreground">
+                    <div className="font-medium text-foreground">{dealer.name}</div>
+                    {dealer.gstin && <div>GSTIN: {dealer.gstin}</div>}
+                    {dealer.address && <div className="whitespace-pre-line">{dealer.address}</div>}
+                    {dealer.phone && <div>{dealer.phone}</div>}
+                    {dealer.email && <div>{dealer.email}</div>}
+                  </div>
+                ) : <div className="text-muted-foreground">—</div>}
+              </div>
+              <div>
+                <div className="mb-1 font-semibold">Bill To (Customer)</div>
+                {customer ? (
+                  <div className="space-y-0.5 text-muted-foreground">
+                    <div className="font-medium text-foreground">{customer.name}</div>
+                    {customer.vehicle_reg && <div>Vehicle: {customer.vehicle_reg} {customer.vehicle_make_model ?? ""}</div>}
+                    {customer.phone && <div>{customer.phone}</div>}
+                    {customer.address && <div className="whitespace-pre-line">{customer.address}</div>}
+                  </div>
+                ) : <div className="text-muted-foreground">—</div>}
+              </div>
+            </div>
+
+            <div><span className="font-semibold">Issue date:</span> {formatDate(issueDate)}</div>
+
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-3 py-2 text-left">#</th>
+                    <th className="px-3 py-2 text-left">Description</th>
+                    <th className="px-3 py-2 text-right">Qty</th>
+                    <th className="px-3 py-2 text-right">Rate</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it, i) => (
+                    <tr key={i} className="border-t">
+                      <td className="px-3 py-2">{i + 1}</td>
+                      <td className="px-3 py-2">{it.description}</td>
+                      <td className="px-3 py-2 text-right">{it.qty}</td>
+                      <td className="px-3 py-2 text-right">{formatINR(it.rate)}</td>
+                      <td className="px-3 py-2 text-right">{formatINR(it.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="ml-auto w-full max-w-xs space-y-1 rounded-md bg-muted p-4">
+              <Row label="Subtotal" value={formatINR(subtotal)} />
+              {gstEnabled
+                ? <Row label={`GST @ ${gstRate}%`} value={formatINR(gstAmt)} />
+                : <Row label="GST" value="Not applied" />}
+              <div className="my-2 border-t" />
+              <Row label="Total" value={formatINR(total)} bold />
+            </div>
+
+            {notes && (
+              <div>
+                <div className="font-semibold">Notes</div>
+                <div className="whitespace-pre-line text-muted-foreground">{notes}</div>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">Invoice number will be assigned on confirm.</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPreviewOpen(false)} disabled={busy}>Back to edit</Button>
+            <Button type="button" onClick={confirmCreate} disabled={busy}>{busy ? "Creating…" : "Confirm & create"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
