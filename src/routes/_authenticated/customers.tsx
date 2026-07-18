@@ -97,7 +97,7 @@ function CustomersPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editing?.id ? "Edit customer" : "New customer"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing?.id ? "Edit vendor" : "New vendor"}</DialogTitle></DialogHeader>
           {editing && (
             <form onSubmit={save} className="space-y-3">
               <Field label="Name *"><Input required value={editing.name} onChange={(e) => setEditing({ ...editing!, name: e.target.value })} /></Field>
