@@ -83,7 +83,7 @@ function Dashboard() {
       <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-4">
         <div className="relative md:col-span-2">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search number, dealer, customer, amount…"
+          <Input placeholder="Search number, dealer, vendor, amount…"
             className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <Select value={status} onValueChange={setStatus}>
@@ -119,7 +119,7 @@ function Dashboard() {
                   <th className="px-4 py-3">Number</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Dealer</th>
-                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Vendor</th>
                   <th className="px-4 py-3 text-right">Total</th>
                   <th className="px-4 py-3 text-right">Paid</th>
                   <th className="px-4 py-3">Status</th>
