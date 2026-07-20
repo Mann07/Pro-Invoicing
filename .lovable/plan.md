@@ -1,58 +1,60 @@
 
-## 1. DOCX → PDF via Adobe PDF Services
+## 1. Client-side DOCX → PDF via browser print
 
-Replace the current jsPDF client-side redraw with a server-rendered PDF that comes straight from the populated Word template.
+The server continues to generate the DOCX from the uploaded Word template (source of truth). PDF is produced in the user's browser by rendering that DOCX and triggering the browser's native "Save as PDF" print dialog. No servers, no installs, no third-party accounts.
 
-- Request Adobe credentials (`ADOBE_PDF_CLIENT_ID`, `ADOBE_PDF_CLIENT_SECRET`) via `add_secret` after the user confirms. They come from an Adobe Developer Console project with **PDF Services API** enabled.
-- New server function `renderInvoicePdf` in `src/lib/invoice.functions.ts`:
-  1. Loads the invoice's stored DOCX from the `invoices` storage bucket (or renders it on-demand from the active template if missing).
-  2. Gets an Adobe access token, uploads the DOCX asset, submits a Create PDF job, polls until done, downloads the resulting PDF.
-  3. Uploads the PDF to the `invoices` bucket at `<invoice_id>.pdf`, stores the path on the invoice row, returns a short-lived signed URL.
-- Invoice detail page (`src/routes/_authenticated/invoices.$id.tsx`): "Download PDF" calls `renderInvoicePdf` and downloads the signed URL. Cache it — if `pdf_path` already exists and the invoice hasn't changed since, reuse it. Regenerate automatically when the invoice is edited or the template changes.
-- Delete `src/lib/pdf-client.ts` and remove `jspdf` / `jspdf-autotable` from `package.json`.
-- The PDF is now literally the Word file rendered by Adobe: fonts, tables, header/footer, logo, signature, margins, page size — all preserved.
+**Library:** `docx-preview` (MIT, ~200KB, pure JS). It renders a `.docx` into a real HTML DOM tree that mirrors the Word layout — fonts, tables, borders, images, headers, footers, page breaks, page size — using the DOCX's own styles.
+
+**Flow in `src/routes/_authenticated/invoices.$id.tsx`:**
+1. "Download DOCX" — unchanged, direct download from storage.
+2. "Save as PDF" (new) — fetches the DOCX bytes from storage, opens a hidden print iframe with print-tuned CSS (`@page` size/margins from the DOCX section props, `-webkit-print-color-adjust: exact`), renders via `docx-preview` into the iframe, then calls `iframe.contentWindow.print()`. The user picks "Save as PDF" as the destination in the standard browser print dialog (Chrome/Edge/Safari/Firefox all have this built in) — same one click as printing any page.
+3. A small on-screen note next to the button: *"In the print dialog, set Destination to 'Save as PDF' and Margins to 'Default'."*
+
+**Remove:**
+- `src/lib/pdf-client.ts` (jsPDF redraw of the invoice — inconsistent with the DOCX template).
+- `jspdf` and `jspdf-autotable` from `package.json`.
+- The `pdf_path` column and server-side PDF storage stay in the schema unused for now — no migration needed to drop them.
+
+**Install:** `bun add docx-preview`.
 
 ## 2. Quantity & Rate as plain numeric inputs
 
-In `src/routes/_authenticated/invoices.new.tsx` line-item row:
-
-- Replace `<Input type="number">` for Qty and Rate with plain `<Input inputMode="decimal">` fields using a regex-filtered `onChange` that accepts digits and one decimal point.
-- Placeholders: `Qty` and `Rate`. No spinner arrows (native number stepper removed by switching off `type="number"`).
-- Amount stays auto-computed as `qty * rate` and remains read-only.
-- Same treatment on the invoice edit path if it uses the same component.
+In `src/routes/_authenticated/invoices.new.tsx` (and the edit surface if any):
+- Replace `<Input type="number">` for Qty and Rate with `<Input inputMode="decimal">` filtered by regex `^\d*\.?\d*$`. No native spinner arrows.
+- Placeholders: `Qty` and `Rate`.
+- Amount stays auto-computed (`qty * rate`), read-only.
 
 ## 3. Single-admin authentication
 
-Convert the app from multi-user to a single administrator account.
+Convert from multi-user to a single administrator account and tighten the current-view RLS findings.
 
-**Database (one migration):**
-- Drop the `handle_new_user` trigger on `auth.users` and the function.
-- Keep `profiles` and `user_roles` tables (harmless), but no longer auto-populate them.
-- Tighten the overly-permissive RLS flagged by the security scanner: change `customers`, `dealers`, `invoices` policies from `USING(true)` to `USING(has_role(auth.uid(),'admin'))` with matching `WITH CHECK`. Same for the `invoices` storage bucket policies. This solves the current-view security errors as a side effect of going single-admin.
-- Seed the admin: insert the chosen email into `auth.users` via `supabaseAdmin.auth.admin.createUser` inside a one-shot server function invoked from a small setup script (or the migration uses the Auth admin API via `pg_net` — simpler: a `setup-admin.functions.ts` we run once). Delete all other existing `auth.users` rows and their `user_roles` first.
+**Database migration:**
+- Drop trigger `on_auth_user_created` on `auth.users` and function `handle_new_user()`.
+- Rewrite the permissive `USING(true)` policies on `customers`, `dealers`, `invoices` to `USING(has_role(auth.uid(),'admin'))` with matching `WITH CHECK`. Same tightening for the `invoices` storage bucket policies (bucket_id + admin role).
+- Restrict `invoice_counters` and `invoice_templates` reads to admins (both current-view warnings).
+- Revoke `EXECUTE` on `next_invoice_number`, `next_invoice_number_for_dealer`, and `has_role` from `anon`; keep `EXECUTE` for `authenticated` since server functions call them (resolves the two SECURITY DEFINER lints for the anon role).
 
-**Supabase Auth config:**
-- Call `supabase--configure_auth` to disable public signups (`enable_signup: false`), keep email/password enabled, disable email confirmations, and enable password recovery emails.
+**Admin seeding (after migration approval):**
+- Ask for the initial admin password via `add_secret` (`ADMIN_INITIAL_PASSWORD`).
+- One-shot server function `seed-admin.functions.ts` (invoke once via the invoke tool): deletes any existing `auth.users` rows, creates `dattauto0510@gmail.com` via `supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true })`, inserts the matching `profiles` and `user_roles` (admin) rows. File deleted after successful run.
+
+**Supabase Auth config** (via `supabase--configure_auth`): `disable_signup: true`, `auto_confirm_email: true`, `external_anonymous_users_enabled: false`.
 
 **Frontend:**
-- `src/routes/auth.tsx`: remove the Sign Up tab/form entirely. Login form only, plus a "Forgot password?" link.
-- New `src/routes/forgot-password.tsx` (public): email input → `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`.
-- New `src/routes/reset-password.tsx` (public): detects `type=recovery` in the URL hash, shows a new-password form, calls `supabase.auth.updateUser({ password })`.
-- New `src/routes/_authenticated/settings.tsx`: profile page with a "Change password" form (`supabase.auth.updateUser({ password })` after confirming the current one via re-auth).
-- Sidebar: add "Settings" link; remove any user-management surfaces (none currently exist beyond auth).
+- `src/routes/auth.tsx` — remove the Sign Up tab entirely. Keep only the Login form and add a "Forgot password?" link.
+- New public route `src/routes/forgot-password.tsx` — email input → `supabase.auth.resetPasswordForEmail(email, { redirectTo: ${origin}/reset-password })`.
+- New public route `src/routes/reset-password.tsx` — reads recovery token from URL hash, shows new-password form, calls `supabase.auth.updateUser({ password })`.
+- New protected route `src/routes/_authenticated/settings.tsx` — "Change password" form (calls `supabase.auth.updateUser({ password })`).
+- Sidebar in `src/routes/_authenticated/route.tsx` — add Settings link.
 
-## 4. Ask the user for the admin email
+## Files touched
 
-Before running the migration/seed, I'll ask for the fresh admin email + initial password (via `add_secret` for the password so it's not in chat).
-
-## Technical notes
-
-- Adobe PDF Services REST flow: `POST /token` → `POST /assets` (get upload URI) → `PUT` the DOCX bytes → `POST /operation/createpdf` → poll `Location` → `GET` download URI → fetch bytes. All done inside `createServerFn` handler; `fetch` + `Buffer` are available on the Worker runtime.
-- Adobe free tier is 500 transactions/month — enough for this volume.
-- Regeneration trigger: any mutation of `invoices` clears `pdf_path`; next download re-renders.
-- RLS tightening + single-admin also resolves the 4 error-level and 2 warn-level findings in the current security scan view.
+- **New:** `src/routes/forgot-password.tsx`, `src/routes/reset-password.tsx`, `src/routes/_authenticated/settings.tsx`, `src/lib/docx-to-pdf.ts` (browser print helper), `src/lib/seed-admin.functions.ts` (temporary).
+- **Edited:** `src/routes/auth.tsx`, `src/routes/_authenticated/route.tsx`, `src/routes/_authenticated/invoices.$id.tsx`, `src/routes/_authenticated/invoices.new.tsx`, `package.json`.
+- **Deleted:** `src/lib/pdf-client.ts`, `src/lib/seed-admin.functions.ts` (after run).
 
 ## Out of scope
 
-- No multi-tenant features, no invitations, no role management UI.
-- Existing invoice data is preserved.
+- No multi-user, roles UI, invitations, or user management.
+- No server-side PDF generation and no third-party conversion service.
+- Existing invoice, dealer, and vendor data preserved.
