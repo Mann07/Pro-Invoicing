@@ -1,103 +1,58 @@
-# Dealer Invoicing — Revision Plan
 
-Rebrand app, restructure invoices around dealer-scoped numbering, add HSN/SAC + amount-in-words, and rename customers → vendors. Existing routes/server functions are extended; no rewrite.
+## 1. DOCX → PDF via Adobe PDF Services
 
-## 1. Rebrand: "RTO Invoicing" → "Dealer Invoicing"
+Replace the current jsPDF client-side redraw with a server-rendered PDF that comes straight from the populated Word template.
 
-Update title/description/OG in `src/routes/__root.tsx`, sidebar brand in `_authenticated/route.tsx`, landing hero in `index.tsx`, and auth heading in `auth.tsx`.
+- Request Adobe credentials (`ADOBE_PDF_CLIENT_ID`, `ADOBE_PDF_CLIENT_SECRET`) via `add_secret` after the user confirms. They come from an Adobe Developer Console project with **PDF Services API** enabled.
+- New server function `renderInvoicePdf` in `src/lib/invoice.functions.ts`:
+  1. Loads the invoice's stored DOCX from the `invoices` storage bucket (or renders it on-demand from the active template if missing).
+  2. Gets an Adobe access token, uploads the DOCX asset, submits a Create PDF job, polls until done, downloads the resulting PDF.
+  3. Uploads the PDF to the `invoices` bucket at `<invoice_id>.pdf`, stores the path on the invoice row, returns a short-lived signed URL.
+- Invoice detail page (`src/routes/_authenticated/invoices.$id.tsx`): "Download PDF" calls `renderInvoicePdf` and downloads the signed URL. Cache it — if `pdf_path` already exists and the invoice hasn't changed since, reuse it. Regenerate automatically when the invoice is edited or the template changes.
+- Delete `src/lib/pdf-client.ts` and remove `jspdf` / `jspdf-autotable` from `package.json`.
+- The PDF is now literally the Word file rendered by Adobe: fonts, tables, header/footer, logo, signature, margins, page size — all preserved.
 
-## 2. Dealer master — new fields
+## 2. Quantity & Rate as plain numeric inputs
 
-Add to `dealers`:
-- `nickname text` — internal tracking label (shown in dealer lists/search, **never** in generated invoices).
-- `invoice_name text` — legal name printed on the invoice (falls back to `name` if blank).
-- `invoice_prefix text not null` — e.g. `EMIBM-`, `KAT-`. Editable.
-- `contact_person text`, `notes text` (spec lists them; cheap to add now).
+In `src/routes/_authenticated/invoices.new.tsx` line-item row:
 
-Update `dealers.tsx` form + table: nickname column visible internally, invoice_name + prefix editable. Search matches nickname too.
+- Replace `<Input type="number">` for Qty and Rate with plain `<Input inputMode="decimal">` fields using a regex-filtered `onChange` that accepts digits and one decimal point.
+- Placeholders: `Qty` and `Rate`. No spinner arrows (native number stepper removed by switching off `type="number"`).
+- Amount stays auto-computed as `qty * rate` and remains read-only.
+- Same treatment on the invoice edit path if it uses the same component.
 
-Server invoice render uses `dealer.invoice_name ?? dealer.name` — nickname never enters the docx payload.
+## 3. Single-admin authentication
 
-## 3. Terminology: Customers → Vendors (UI only)
+Convert the app from multi-user to a single administrator account.
 
-Keep the `customers` table + `customer_id` FK; rename in UI only to avoid a destructive migration.
-- Rename `customers.tsx` route file → `vendors.tsx`, update sidebar link and all labels.
-- Short code comment notes the alias.
+**Database (one migration):**
+- Drop the `handle_new_user` trigger on `auth.users` and the function.
+- Keep `profiles` and `user_roles` tables (harmless), but no longer auto-populate them.
+- Tighten the overly-permissive RLS flagged by the security scanner: change `customers`, `dealers`, `invoices` policies from `USING(true)` to `USING(has_role(auth.uid(),'admin'))` with matching `WITH CHECK`. Same for the `invoices` storage bucket policies. This solves the current-view security errors as a side effect of going single-admin.
+- Seed the admin: insert the chosen email into `auth.users` via `supabaseAdmin.auth.admin.createUser` inside a one-shot server function invoked from a small setup script (or the migration uses the Auth admin API via `pg_net` — simpler: a `setup-admin.functions.ts` we run once). Delete all other existing `auth.users` rows and their `user_roles` first.
 
-Invoice creation adds a **Bill Type** toggle: **Dealer** (default, no vendor row shown) or **Vendor** (shows vendor picker; dealer still selected for prefix/numbering).
+**Supabase Auth config:**
+- Call `supabase--configure_auth` to disable public signups (`enable_signup: false`), keep email/password enabled, disable email confirmations, and enable password recovery emails.
 
-## 4. Dealer-scoped invoice numbering
+**Frontend:**
+- `src/routes/auth.tsx`: remove the Sign Up tab/form entirely. Login form only, plus a "Forgot password?" link.
+- New `src/routes/forgot-password.tsx` (public): email input → `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`.
+- New `src/routes/reset-password.tsx` (public): detects `type=recovery` in the URL hash, shows a new-password form, calls `supabase.auth.updateUser({ password })`.
+- New `src/routes/_authenticated/settings.tsx`: profile page with a "Change password" form (`supabase.auth.updateUser({ password })` after confirming the current one via re-auth).
+- Sidebar: add "Settings" link; remove any user-management surfaces (none currently exist beyond auth).
 
-Per-dealer sequences derived from the highest existing number for that dealer's prefix. Manual edits push the next suggestion forward.
+## 4. Ask the user for the admin email
 
-New RPC `next_invoice_number_for_dealer(_dealer_id uuid)`:
-- Reads dealer's `invoice_prefix`.
-- Finds max numeric suffix among existing invoices `WHERE dealer_id = ? AND invoice_number LIKE prefix || '%'`.
-- Returns `prefix || lpad(max+1, 3, '0')` (3-digit like `EMIBM-025`).
+Before running the migration/seed, I'll ask for the fresh admin email + initial password (via `add_secret` for the password so it's not in chat).
 
-Unique index `(dealer_id, invoice_number)` prevents duplicates. Server insert catches the unique-violation and returns a friendly error; client also does a blur-time uniqueness check.
+## Technical notes
 
-Old `next_invoice_number()` + `invoice_counters` stay in place (unused) — non-destructive; removable later.
+- Adobe PDF Services REST flow: `POST /token` → `POST /assets` (get upload URI) → `PUT` the DOCX bytes → `POST /operation/createpdf` → poll `Location` → `GET` download URI → fetch bytes. All done inside `createServerFn` handler; `fetch` + `Buffer` are available on the Worker runtime.
+- Adobe free tier is 500 transactions/month — enough for this volume.
+- Regeneration trigger: any mutation of `invoices` clears `pdf_path`; next download re-renders.
+- RLS tightening + single-admin also resolves the 4 error-level and 2 warn-level findings in the current security scan view.
 
-## 5. Invoice creation flow
+## Out of scope
 
-Rework `invoices.new.tsx`:
-- Step 1: pick Dealer → immediately call RPC and populate an **editable** Invoice Number input.
-- Bill Type toggle (Dealer/Vendor) as above.
-- Line-item row gains **HSN/SAC** input (small, between Description and Qty).
-- **Amount in words** displays under Total (auto-computed) and is included in the preview + docx.
-- Preview + confirm dialog keeps existing shape, with new columns/rows.
-
-## 6. Server function updates
-
-`src/lib/invoice.functions.ts` `createInvoice`:
-- Accept `invoice_number` (required) and `hsn_sac` per line item.
-- Drop server call to `next_invoice_number()`.
-- Compute `amount_in_words` and pass into template data alongside items with `hsn_sac`.
-- Use `dealer.invoice_name ?? dealer.name` in the docx payload (nickname excluded).
-
-Zod: `LineItemSchema` gains `hsn_sac: z.string().optional()`; input gains `invoice_number: z.string()`.
-
-## 7. Invoice detail + PDF
-
-- `invoices.$id.tsx`: add HSN/SAC column, Amount-in-words line under total.
-- `pdf-client.ts`: same additions so the client PDF matches.
-- Templates page: extend placeholder reference with `{hsn_sac}` (inside items loop) and `{amount_in_words}`.
-
-## 8. Amount-in-words helper
-
-Small pure-JS helper `toIndianWordsINR(total)` in `src/lib/format.ts` — Indian lakh/crore grouping, output like `Rupees Eighteen Thousand Four Hundred Only`. Shared by client preview, PDF, and server render.
-
-## 9. Migration (single call)
-
-```sql
-ALTER TABLE public.dealers
-  ADD COLUMN IF NOT EXISTS nickname text,
-  ADD COLUMN IF NOT EXISTS invoice_name text,
-  ADD COLUMN IF NOT EXISTS invoice_prefix text,
-  ADD COLUMN IF NOT EXISTS contact_person text,
-  ADD COLUMN IF NOT EXISTS notes text;
-
-UPDATE public.dealers SET invoice_prefix = 'INV-' WHERE invoice_prefix IS NULL;
-ALTER TABLE public.dealers ALTER COLUMN invoice_prefix SET NOT NULL;
-
-CREATE UNIQUE INDEX IF NOT EXISTS invoices_dealer_number_unique
-  ON public.invoices (dealer_id, invoice_number);
-
-CREATE OR REPLACE FUNCTION public.next_invoice_number_for_dealer(_dealer_id uuid)
-RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE pfx text; max_n int;
-BEGIN
-  SELECT invoice_prefix INTO pfx FROM public.dealers WHERE id = _dealer_id;
-  IF pfx IS NULL THEN RAISE EXCEPTION 'Dealer not found'; END IF;
-  SELECT COALESCE(MAX(NULLIF(regexp_replace(substring(invoice_number from length(pfx)+1), '\D', '', 'g'), '')::int), 0)
-    INTO max_n
-  FROM public.invoices
-  WHERE dealer_id = _dealer_id AND invoice_number LIKE pfx || '%';
-  RETURN pfx || lpad((max_n + 1)::text, 3, '0');
-END; $$;
-```
-
-## Out of scope this turn
-
-Dealer ledger view, overdue notifications, Business Settings page (logo/signature/bank/UPI QR), Excel report shape changes, edit/duplicate invoice, and server-side DOCX→PDF conversion (client jsPDF stays; true DOCX-fidelity PDF needs LibreOffice which isn't available in the Worker runtime — flagged as next-turn work if you want it).
+- No multi-tenant features, no invitations, no role management UI.
+- Existing invoice data is preserved.
