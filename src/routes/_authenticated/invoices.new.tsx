@@ -183,10 +183,18 @@ function NewInvoice() {
                 value={it.description} onChange={(e) => updateItem(i, { description: e.target.value })} />
               <Input className="col-span-6 md:col-span-2" placeholder="HSN/SAC"
                 value={it.hsn_sac} onChange={(e) => updateItem(i, { hsn_sac: e.target.value })} />
-              <Input className="col-span-3 md:col-span-1" type="number" step="1" placeholder="Qty"
-                value={it.qty} onChange={(e) => updateItem(i, { qty: Number(e.target.value) })} />
-              <Input className="col-span-3 md:col-span-2" type="number" step="0.01" placeholder="Rate"
-                value={it.rate} onChange={(e) => updateItem(i, { rate: Number(e.target.value) })} />
+              <Input className="col-span-3 md:col-span-1" inputMode="decimal" placeholder="Qty"
+                value={it.qty === 0 ? "" : String(it.qty)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || /^\d*\.?\d*$/.test(v)) updateItem(i, { qty: v === "" ? 0 : Number(v) });
+                }} />
+              <Input className="col-span-3 md:col-span-2" inputMode="decimal" placeholder="Rate"
+                value={it.rate === 0 ? "" : String(it.rate)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || /^\d*\.?\d*$/.test(v)) updateItem(i, { rate: v === "" ? 0 : Number(v) });
+                }} />
               <div className="col-span-9 md:col-span-1 flex items-center justify-end text-sm font-medium">
                 {formatINR(it.amount)}
               </div>
