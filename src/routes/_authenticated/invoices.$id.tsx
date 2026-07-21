@@ -119,11 +119,15 @@ function InvoiceDetail() {
             <p className="text-sm text-muted-foreground">Issued {formatDate(inv.issue_date)}</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={downloadDocx}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
-          <Button variant="outline" onClick={downloadPdf}><Download className="mr-2 h-4 w-4" /> PDF</Button>
+        <div className="flex flex-col items-end gap-1 md:flex-row md:items-center md:gap-2">
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={downloadDocx}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
+            <Button onClick={saveAsPdf}><Printer className="mr-2 h-4 w-4" /> Save as PDF</Button>
+          </div>
+          <p className="text-xs text-muted-foreground md:ml-2">In the print dialog, pick "Save as PDF".</p>
         </div>
       </div>
+
 
       <div className="grid gap-4 md:grid-cols-2">
         <InfoCard title="Dealer">
