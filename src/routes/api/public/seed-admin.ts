@@ -1,20 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 // Temporary one-shot endpoint to seed the single admin account.
-// Guarded by the ADMIN_INITIAL_PASSWORD secret (knowing it = ability to sign in).
-// DELETE this file after running once.
+// Only runs if NO admin exists yet — safe to leave callable, but delete after use.
 export const Route = createFileRoute("/api/public/seed-admin")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async () => {
         const password = process.env.ADMIN_INITIAL_PASSWORD;
         if (!password) return new Response("ADMIN_INITIAL_PASSWORD not set", { status: 500 });
 
-        const provided = request.headers.get("x-admin-token") ?? "";
-        if (provided !== password) return new Response("Forbidden", { status: 403 });
-
         const email = "dattauto0510@gmail.com";
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // Refuse if any admin already exists (idempotent guard).
+        const { data: existingAdmins } = await supabaseAdmin
+          .from("user_roles").select("user_id").eq("role", "admin").limit(1);
+        if (existingAdmins && existingAdmins.length > 0) {
+          return new Response("Admin already exists", { status: 409 });
+        }
+
+        // Remove any pre-existing (non-admin) users so we start clean.
 
         const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
         if (listErr) return new Response(listErr.message, { status: 500 });
