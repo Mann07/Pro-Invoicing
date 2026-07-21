@@ -3,17 +3,17 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, Download, FileText } from "lucide-react";
+import { ArrowLeft, Printer, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectItem as _S, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { getInvoiceDownloadUrl } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
-import { generateInvoicePdf } from "@/lib/pdf-client";
+import { printDocxAsPdf } from "@/lib/docx-to-pdf";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
   component: InvoiceDetail,
@@ -85,10 +85,17 @@ function InvoiceDetail() {
     } catch (e: any) { toast.error(e.message); }
   }
 
-  async function downloadPdf() {
-    if (!inv) return;
-    await generateInvoicePdf(inv);
+  async function saveAsPdf() {
+    if (!inv?.docx_path) return toast.error("No DOCX generated (no active template).");
+    try {
+      const { url } = await dlFn({ data: { path: inv.docx_path } });
+      const res = await fetch(url);
+      const blob = await res.blob();
+      toast.info("Opening print dialog — choose 'Save as PDF' as destination.");
+      await printDocxAsPdf(blob, `${inv.invoice_number}.pdf`);
+    } catch (e: any) { toast.error(e.message); }
   }
+
 
 
   async function deleteInvoice() {
