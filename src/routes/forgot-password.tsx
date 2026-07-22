@@ -3,23 +3,22 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+
+const ADMIN_EMAIL = "dattauto0510@gmail.com";
 
 export const Route = createFileRoute("/forgot-password")({
   component: ForgotPassword,
 });
 
 function ForgotPassword() {
-  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(ADMIN_EMAIL, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setBusy(false);
@@ -41,20 +40,17 @@ function ForgotPassword() {
         <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-sm">
           <h1 className="text-2xl font-bold tracking-tight">Reset password</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            We'll email you a link to set a new password.
+            A reset link will be sent to the administrator's email on file:
+            <br />
+            <span className="font-medium text-foreground">{ADMIN_EMAIL}</span>
           </p>
           {sent ? (
             <div className="mt-6 rounded-md border bg-muted p-4 text-sm">
-              Check your inbox for the reset link. If it doesn't arrive within a few minutes,
-              check your spam folder.
+              Check the inbox for the reset link. If it doesn't arrive within a few minutes,
+              check the spam folder.
             </div>
           ) : (
             <form onSubmit={onSubmit} className="mt-6 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fp-email">Email</Label>
-                <Input id="fp-email" type="email" required
-                  value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
               <Button className="w-full" disabled={busy}>
                 {busy ? "Sending…" : "Send reset link"}
               </Button>
