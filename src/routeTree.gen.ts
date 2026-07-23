@@ -19,7 +19,6 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedDealersRouteImport } from './routes/_authenticated/dealers'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedInvoicesNewRouteImport } from './routes/_authenticated/invoices.new'
 import { Route as AuthenticatedInvoicesIdRouteImport } from './routes/_authenticated/invoices.$id'
 
@@ -72,11 +71,6 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
-  id: '/customers',
-  path: '/customers',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedInvoicesNewRoute =
   AuthenticatedInvoicesNewRouteImport.update({
     id: '/invoices/new',
@@ -94,7 +88,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/dealers': typeof AuthenticatedDealersRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -108,7 +101,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/dealers': typeof AuthenticatedDealersRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -124,7 +116,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/dealers': typeof AuthenticatedDealersRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -140,7 +131,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/forgot-password'
     | '/reset-password'
-    | '/customers'
     | '/dashboard'
     | '/dealers'
     | '/reports'
@@ -154,7 +144,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/forgot-password'
     | '/reset-password'
-    | '/customers'
     | '/dashboard'
     | '/dealers'
     | '/reports'
@@ -169,7 +158,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/forgot-password'
     | '/reset-password'
-    | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/dealers'
     | '/_authenticated/reports'
@@ -259,13 +247,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/customers': {
-      id: '/_authenticated/customers'
-      path: '/customers'
-      fullPath: '/customers'
-      preLoaderRoute: typeof AuthenticatedCustomersRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/invoices/new': {
       id: '/_authenticated/invoices/new'
       path: '/invoices/new'
@@ -284,7 +265,6 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDealersRoute: typeof AuthenticatedDealersRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -295,7 +275,6 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDealersRoute: AuthenticatedDealersRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
