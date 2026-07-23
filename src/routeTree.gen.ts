@@ -14,14 +14,19 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedVendorsRouteImport } from './routes/_authenticated/vendors'
+import { Route as AuthenticatedTransportersRouteImport } from './routes/_authenticated/transporters'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedDealersRouteImport } from './routes/_authenticated/dealers'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
+import { Route as AuthenticatedVendorsIdRouteImport } from './routes/_authenticated/vendors.$id'
+import { Route as AuthenticatedTransportersIdRouteImport } from './routes/_authenticated/transporters.$id'
 import { Route as AuthenticatedInvoicesNewRouteImport } from './routes/_authenticated/invoices.new'
 import { Route as AuthenticatedInvoicesIdRouteImport } from './routes/_authenticated/invoices.$id'
+import { Route as AuthenticatedDealersIdRouteImport } from './routes/_authenticated/dealers.$id'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -47,6 +52,17 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedVendorsRoute = AuthenticatedVendorsRouteImport.update({
+  id: '/vendors',
+  path: '/vendors',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTransportersRoute =
+  AuthenticatedTransportersRouteImport.update({
+    id: '/transporters',
+    path: '/transporters',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -77,6 +93,17 @@ const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedVendorsIdRoute = AuthenticatedVendorsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedVendorsRoute,
+} as any)
+const AuthenticatedTransportersIdRoute =
+  AuthenticatedTransportersIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedTransportersRoute,
+  } as any)
 const AuthenticatedInvoicesNewRoute =
   AuthenticatedInvoicesNewRouteImport.update({
     id: '/invoices/new',
@@ -88,6 +115,11 @@ const AuthenticatedInvoicesIdRoute = AuthenticatedInvoicesIdRouteImport.update({
   path: '/invoices/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDealersIdRoute = AuthenticatedDealersIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedDealersRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,12 +128,17 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/dealers': typeof AuthenticatedDealersRoute
+  '/dealers': typeof AuthenticatedDealersRouteWithChildren
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/templates': typeof AuthenticatedTemplatesRoute
+  '/transporters': typeof AuthenticatedTransportersRouteWithChildren
+  '/vendors': typeof AuthenticatedVendorsRouteWithChildren
+  '/dealers/$id': typeof AuthenticatedDealersIdRoute
   '/invoices/$id': typeof AuthenticatedInvoicesIdRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
+  '/transporters/$id': typeof AuthenticatedTransportersIdRoute
+  '/vendors/$id': typeof AuthenticatedVendorsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,12 +147,17 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/dealers': typeof AuthenticatedDealersRoute
+  '/dealers': typeof AuthenticatedDealersRouteWithChildren
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/templates': typeof AuthenticatedTemplatesRoute
+  '/transporters': typeof AuthenticatedTransportersRouteWithChildren
+  '/vendors': typeof AuthenticatedVendorsRouteWithChildren
+  '/dealers/$id': typeof AuthenticatedDealersIdRoute
   '/invoices/$id': typeof AuthenticatedInvoicesIdRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
+  '/transporters/$id': typeof AuthenticatedTransportersIdRoute
+  '/vendors/$id': typeof AuthenticatedVendorsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -126,12 +168,17 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/dealers': typeof AuthenticatedDealersRoute
+  '/_authenticated/dealers': typeof AuthenticatedDealersRouteWithChildren
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
+  '/_authenticated/transporters': typeof AuthenticatedTransportersRouteWithChildren
+  '/_authenticated/vendors': typeof AuthenticatedVendorsRouteWithChildren
+  '/_authenticated/dealers/$id': typeof AuthenticatedDealersIdRoute
   '/_authenticated/invoices/$id': typeof AuthenticatedInvoicesIdRoute
   '/_authenticated/invoices/new': typeof AuthenticatedInvoicesNewRoute
+  '/_authenticated/transporters/$id': typeof AuthenticatedTransportersIdRoute
+  '/_authenticated/vendors/$id': typeof AuthenticatedVendorsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -146,8 +193,13 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/templates'
+    | '/transporters'
+    | '/vendors'
+    | '/dealers/$id'
     | '/invoices/$id'
     | '/invoices/new'
+    | '/transporters/$id'
+    | '/vendors/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -160,8 +212,13 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/templates'
+    | '/transporters'
+    | '/vendors'
+    | '/dealers/$id'
     | '/invoices/$id'
     | '/invoices/new'
+    | '/transporters/$id'
+    | '/vendors/$id'
   id:
     | '__root__'
     | '/'
@@ -175,8 +232,13 @@ export interface FileRouteTypes {
     | '/_authenticated/reports'
     | '/_authenticated/settings'
     | '/_authenticated/templates'
+    | '/_authenticated/transporters'
+    | '/_authenticated/vendors'
+    | '/_authenticated/dealers/$id'
     | '/_authenticated/invoices/$id'
     | '/_authenticated/invoices/new'
+    | '/_authenticated/transporters/$id'
+    | '/_authenticated/vendors/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -224,6 +286,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/vendors': {
+      id: '/_authenticated/vendors'
+      path: '/vendors'
+      fullPath: '/vendors'
+      preLoaderRoute: typeof AuthenticatedVendorsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/transporters': {
+      id: '/_authenticated/transporters'
+      path: '/transporters'
+      fullPath: '/transporters'
+      preLoaderRoute: typeof AuthenticatedTransportersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/templates': {
       id: '/_authenticated/templates'
       path: '/templates'
@@ -266,6 +342,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/vendors/$id': {
+      id: '/_authenticated/vendors/$id'
+      path: '/$id'
+      fullPath: '/vendors/$id'
+      preLoaderRoute: typeof AuthenticatedVendorsIdRouteImport
+      parentRoute: typeof AuthenticatedVendorsRoute
+    }
+    '/_authenticated/transporters/$id': {
+      id: '/_authenticated/transporters/$id'
+      path: '/$id'
+      fullPath: '/transporters/$id'
+      preLoaderRoute: typeof AuthenticatedTransportersIdRouteImport
+      parentRoute: typeof AuthenticatedTransportersRoute
+    }
     '/_authenticated/invoices/new': {
       id: '/_authenticated/invoices/new'
       path: '/invoices/new'
@@ -280,16 +370,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvoicesIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dealers/$id': {
+      id: '/_authenticated/dealers/$id'
+      path: '/$id'
+      fullPath: '/dealers/$id'
+      preLoaderRoute: typeof AuthenticatedDealersIdRouteImport
+      parentRoute: typeof AuthenticatedDealersRoute
+    }
   }
 }
+
+interface AuthenticatedDealersRouteChildren {
+  AuthenticatedDealersIdRoute: typeof AuthenticatedDealersIdRoute
+}
+
+const AuthenticatedDealersRouteChildren: AuthenticatedDealersRouteChildren = {
+  AuthenticatedDealersIdRoute: AuthenticatedDealersIdRoute,
+}
+
+const AuthenticatedDealersRouteWithChildren =
+  AuthenticatedDealersRoute._addFileChildren(AuthenticatedDealersRouteChildren)
+
+interface AuthenticatedTransportersRouteChildren {
+  AuthenticatedTransportersIdRoute: typeof AuthenticatedTransportersIdRoute
+}
+
+const AuthenticatedTransportersRouteChildren: AuthenticatedTransportersRouteChildren =
+  {
+    AuthenticatedTransportersIdRoute: AuthenticatedTransportersIdRoute,
+  }
+
+const AuthenticatedTransportersRouteWithChildren =
+  AuthenticatedTransportersRoute._addFileChildren(
+    AuthenticatedTransportersRouteChildren,
+  )
+
+interface AuthenticatedVendorsRouteChildren {
+  AuthenticatedVendorsIdRoute: typeof AuthenticatedVendorsIdRoute
+}
+
+const AuthenticatedVendorsRouteChildren: AuthenticatedVendorsRouteChildren = {
+  AuthenticatedVendorsIdRoute: AuthenticatedVendorsIdRoute,
+}
+
+const AuthenticatedVendorsRouteWithChildren =
+  AuthenticatedVendorsRoute._addFileChildren(AuthenticatedVendorsRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedDealersRoute: typeof AuthenticatedDealersRoute
+  AuthenticatedDealersRoute: typeof AuthenticatedDealersRouteWithChildren
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
+  AuthenticatedTransportersRoute: typeof AuthenticatedTransportersRouteWithChildren
+  AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRouteWithChildren
   AuthenticatedInvoicesIdRoute: typeof AuthenticatedInvoicesIdRoute
   AuthenticatedInvoicesNewRoute: typeof AuthenticatedInvoicesNewRoute
 }
@@ -297,10 +432,12 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedDealersRoute: AuthenticatedDealersRoute,
+  AuthenticatedDealersRoute: AuthenticatedDealersRouteWithChildren,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
+  AuthenticatedTransportersRoute: AuthenticatedTransportersRouteWithChildren,
+  AuthenticatedVendorsRoute: AuthenticatedVendorsRouteWithChildren,
   AuthenticatedInvoicesIdRoute: AuthenticatedInvoicesIdRoute,
   AuthenticatedInvoicesNewRoute: AuthenticatedInvoicesNewRoute,
 }
@@ -318,13 +455,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

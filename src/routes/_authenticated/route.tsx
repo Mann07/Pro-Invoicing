@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  LayoutDashboard, FileText, Users, Car, FileCog, BarChart3, LogOut, Menu, X, PlusCircle, Settings,
+  LayoutDashboard, FileText, Users, Truck, User, FileCog, BarChart3, LogOut, Menu, X, PlusCircle, Settings, Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,8 +20,10 @@ export const Route = createFileRoute("/_authenticated")({
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/invoices/new", label: "New Invoice", icon: PlusCircle },
-  { to: "/dealers", label: "Dealers", icon: Users },
-  { to: "/customers", label: "Vendors", icon: Car },
+  { to: "/dealers", label: "Dealers", icon: Store },
+  { to: "/vendors", label: "Vendors", icon: Users },
+  { to: "/transporters", label: "Transporters", icon: Truck },
+  { to: "/customers", label: "Customers", icon: User },
   { to: "/templates", label: "Templates", icon: FileCog },
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: Settings },
