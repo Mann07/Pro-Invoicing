@@ -1,19 +1,17 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, Printer, FileText } from "lucide-react";
+import { ArrowLeft, FileText, FileDown, Ban, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { getInvoiceDownloadUrl } from "@/lib/invoice.functions";
+import { addPayment, cancelInvoice, getInvoiceDownloadUrl } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
-import { printDocxAsPdf } from "@/lib/docx-to-pdf";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
   component: InvoiceDetail,
@@ -22,85 +20,96 @@ export const Route = createFileRoute("/_authenticated/invoices/$id")({
 const statusColors: Record<string, string> = {
   paid: "bg-success text-success-foreground",
   partial: "bg-warning text-warning-foreground",
-  unpaid: "bg-destructive text-destructive-foreground",
+  pending: "bg-destructive text-destructive-foreground",
+  draft: "bg-muted text-muted-foreground",
+  cancelled: "bg-muted text-muted-foreground",
 };
 
 function InvoiceDetail() {
-  const { id } = Route.useParams();
+  const { id } = useParams({ from: "/_authenticated/invoices/$id" });
   const navigate = useNavigate();
   const qc = useQueryClient();
   const dlFn = useServerFn(getInvoiceDownloadUrl);
+  const payFn = useServerFn(addPayment);
+  const cancelFn = useServerFn(cancelInvoice);
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ["invoice", id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*, dealers(*), customers(*)")
-        .eq("id", id).maybeSingle();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => (await (supabase as any).from("invoices").select("*").eq("id", id).maybeSingle()).data as any,
   });
 
-  const [status, setStatus] = useState<string>("");
-  const [amountPaid, setAmountPaid] = useState<string>("");
-  const [paymentDate, setPaymentDate] = useState(todayISO());
-  const [paymentNotes, setPaymentNotes] = useState("");
-  const [saving, setSaving] = useState(false);
+  // Fetch party + payments in parallel once we know the module
+  const { data: party } = useQuery({
+    queryKey: ["invoice-party", id, inv?.module, inv?.dealer_id ?? inv?.vendor_id ?? inv?.transporter_id],
+    queryFn: async () => {
+      if (!inv) return null;
+      if (inv.module === "dealer" && inv.dealer_id) return (await (supabase as any).from("dealers").select("*").eq("id", inv.dealer_id).maybeSingle()).data;
+      if (inv.module === "vendor" && inv.vendor_id) return (await (supabase as any).from("vendors").select("*").eq("id", inv.vendor_id).maybeSingle()).data;
+      if (inv.module === "transporter" && inv.transporter_id) return (await (supabase as any).from("transporters").select("*").eq("id", inv.transporter_id).maybeSingle()).data;
+      return null;
+    },
+    enabled: !!inv && inv.module !== "customer",
+  });
+
+  const { data: payments = [] } = useQuery({
+    queryKey: ["payments", id],
+    queryFn: async () => (await (supabase as any).from("invoice_payments").select("*").eq("invoice_id", id).order("paid_on", { ascending: false })).data ?? [],
+    enabled: !!inv,
+  });
+
+  const [amount, setAmount] = useState("");
+  const [paidOn, setPaidOn] = useState(todayISO());
+  const [payNotes, setPayNotes] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [busy, setBusy] = useState(false);
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading…</div>;
   if (!inv) return <div className="p-6">Not found. <Link to="/dashboard" className="text-primary underline">Back</Link></div>;
 
-  const effectiveStatus = status || inv.status;
-  const effectivePaid = amountPaid === "" ? Number(inv.amount_paid) : Number(amountPaid);
-  const outstanding = Math.max(0, Number(inv.total) - effectivePaid);
-
-  async function savePayment() {
-    if (!inv) return;
-    setSaving(true);
-    const paid = amountPaid === "" ? Number(inv.amount_paid) : Number(amountPaid);
-    let nextStatus = status || inv.status;
-    if (paid >= Number(inv.total)) nextStatus = "paid";
-    else if (paid > 0) nextStatus = "partial";
-    else nextStatus = "unpaid";
-    const { error } = await supabase.from("invoices").update({
-      status: nextStatus as any,
-      amount_paid: paid,
-      payment_date: paid > 0 ? paymentDate : null,
-      payment_notes: paymentNotes || inv.payment_notes,
-    }).eq("id", id);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Payment updated");
-    qc.invalidateQueries({ queryKey: ["invoice", id] });
-    qc.invalidateQueries({ queryKey: ["invoices"] });
-  }
+  const locked = inv.status === "paid" || inv.status === "cancelled";
+  const outstanding = Math.max(0, Number(inv.total) - Number(inv.amount_paid));
 
   async function downloadDocx() {
-    if (!inv?.docx_path) return toast.error("No DOCX generated (no active template).");
+    if (!inv.docx_path) return toast.error("No DOCX generated (no active template).");
     try {
       const { url } = await dlFn({ data: { path: inv.docx_path } });
       window.open(url, "_blank");
     } catch (e: any) { toast.error(e.message); }
   }
-
-  async function saveAsPdf() {
-    if (!inv?.docx_path) return toast.error("No DOCX generated (no active template).");
+  async function downloadPdf() {
+    if (!inv.pdf_path) return toast.error("No PDF generated. Check that Gotenberg is reachable and re-create the invoice.");
     try {
-      const { url } = await dlFn({ data: { path: inv.docx_path } });
-      const res = await fetch(url);
-      const blob = await res.blob();
-      toast.info("Opening print dialog — choose 'Save as PDF' as destination.");
-      await printDocxAsPdf(blob, `${inv.invoice_number}.pdf`);
+      const { url } = await dlFn({ data: { path: inv.pdf_path } });
+      window.open(url, "_blank");
     } catch (e: any) { toast.error(e.message); }
   }
 
+  async function recordPayment() {
+    const amt = Number(amount);
+    if (!(amt > 0)) return toast.error("Enter a positive amount");
+    setBusy(true);
+    try {
+      const res = await payFn({ data: { invoice_id: id, amount: amt, paid_on: paidOn, notes: payNotes || null } });
+      toast.success(res.status === "paid" ? "Payment complete — invoice finalized and locked" : "Payment recorded");
+      setAmount(""); setPayNotes("");
+      qc.invalidateQueries({ queryKey: ["invoice", id] });
+      qc.invalidateQueries({ queryKey: ["payments", id] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  }
 
+  async function cancel() {
+    if (!confirm("Cancel this invoice? The number stays reserved.")) return;
+    try {
+      await cancelFn({ data: { invoice_id: id, reason: cancelReason || null } });
+      toast.success("Invoice cancelled");
+      qc.invalidateQueries({ queryKey: ["invoice", id] });
+    } catch (e: any) { toast.error(e.message); }
+  }
 
   async function deleteInvoice() {
-    if (!confirm("Delete this invoice?")) return;
-    const { error } = await supabase.from("invoices").delete().eq("id", id);
+    if (!confirm("Delete this invoice? Its number becomes a gap (a warning will appear).")) return;
+    const { error } = await (supabase as any).from("invoices").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Deleted");
     navigate({ to: "/dashboard" });
@@ -115,40 +124,43 @@ function InvoiceDetail() {
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{inv.invoice_number}</h1>
               <Badge className={statusColors[inv.status]}>{inv.status}</Badge>
+              {locked && <Badge variant="outline"><Lock className="mr-1 h-3 w-3" /> Locked</Badge>}
+              <Badge variant="outline" className="capitalize">{inv.module}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">Issued {formatDate(inv.issue_date)}</p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 md:flex-row md:items-center md:gap-2">
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={downloadDocx}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
-            <Button onClick={saveAsPdf}><Printer className="mr-2 h-4 w-4" /> Save as PDF</Button>
-          </div>
-          <p className="text-xs text-muted-foreground md:ml-2">In the print dialog, pick "Save as PDF".</p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={downloadDocx}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
+          <Button onClick={downloadPdf}><FileDown className="mr-2 h-4 w-4" /> PDF</Button>
         </div>
       </div>
 
-
       <div className="grid gap-4 md:grid-cols-2">
-        <InfoCard title="Dealer">
-          {inv.dealers ? (
+        <InfoCard title={inv.module === "customer" ? "Customer" : inv.module.charAt(0).toUpperCase() + inv.module.slice(1)}>
+          {inv.module === "customer" ? (
             <>
-              <div className="font-medium">{inv.dealers.name}</div>
-              {inv.dealers.gstin && <div className="text-sm text-muted-foreground">GSTIN: {inv.dealers.gstin}</div>}
-              {inv.dealers.address && <div className="text-sm text-muted-foreground">{inv.dealers.address}</div>}
-              {inv.dealers.phone && <div className="text-sm text-muted-foreground">{inv.dealers.phone}</div>}
+              <div className="font-medium">{inv.customer_name || "—"}</div>
+              {inv.customer_gstin && <div className="text-sm text-muted-foreground">GST: {inv.customer_gstin}</div>}
+              {inv.customer_address && <div className="text-sm text-muted-foreground">{inv.customer_address}</div>}
+              {inv.customer_mobile && <div className="text-sm text-muted-foreground">{inv.customer_mobile}</div>}
+              {inv.customer_email && <div className="text-sm text-muted-foreground">{inv.customer_email}</div>}
+            </>
+          ) : party ? (
+            <>
+              <div className="font-medium">{party.name}</div>
+              {party.gstin && <div className="text-sm text-muted-foreground">GSTIN: {party.gstin}</div>}
+              {party.address && <div className="text-sm text-muted-foreground">{party.address}</div>}
+              {party.mobile && <div className="text-sm text-muted-foreground">{party.mobile}</div>}
             </>
           ) : <span className="text-sm text-muted-foreground">—</span>}
         </InfoCard>
-        <InfoCard title="Vendor">
-          {inv.customers ? (
-            <>
-              <div className="font-medium">{inv.customers.name}</div>
-              {inv.customers.vehicle_reg && <div className="text-sm text-muted-foreground">{inv.customers.vehicle_reg} · {inv.customers.vehicle_make_model}</div>}
-              {inv.customers.phone && <div className="text-sm text-muted-foreground">{inv.customers.phone}</div>}
-              {inv.customers.address && <div className="text-sm text-muted-foreground">{inv.customers.address}</div>}
-            </>
-          ) : <span className="text-sm text-muted-foreground">—</span>}
+        <InfoCard title="Documents">
+          <div className="text-sm text-muted-foreground">Template version: {inv.template_version ?? "—"}</div>
+          <div className="text-sm text-muted-foreground">DOCX: {inv.docx_path ? "stored" : "not generated"}</div>
+          <div className="text-sm text-muted-foreground">PDF: {inv.pdf_path ? "stored" : "not generated"}</div>
+          {inv.finalized_at && <div className="text-sm text-muted-foreground">Finalized: {formatDate(inv.finalized_at)}</div>}
+          {inv.cancelled_reason && <div className="text-sm text-muted-foreground">Cancelled: {inv.cancelled_reason}</div>}
         </InfoCard>
       </div>
 
@@ -156,11 +168,8 @@ function InvoiceDetail() {
         <table className="w-full text-sm">
           <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-4 py-2">Description</th>
-              <th className="px-4 py-2">HSN/SAC</th>
-              <th className="px-4 py-2 text-right">Qty</th>
-              <th className="px-4 py-2 text-right">Rate</th>
-              <th className="px-4 py-2 text-right">Amount</th>
+              <th className="px-4 py-2">Description</th><th className="px-4 py-2">HSN/SAC</th>
+              <th className="px-4 py-2 text-right">Qty</th><th className="px-4 py-2 text-right">Rate</th><th className="px-4 py-2 text-right">Amount</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -182,7 +191,7 @@ function InvoiceDetail() {
             <div className="my-1 border-t" />
             <Row label="Total" value={formatINR(inv.total)} bold />
             <Row label="Paid" value={formatINR(inv.amount_paid)} />
-            <Row label="Outstanding" value={formatINR(Number(inv.total) - Number(inv.amount_paid))} />
+            <Row label="Outstanding" value={formatINR(outstanding)} />
           </div>
         </div>
         <div className="border-t p-4 text-sm">
@@ -191,44 +200,45 @@ function InvoiceDetail() {
         </div>
       </div>
 
+      {!locked && (
+        <div className="rounded-lg border bg-card p-5">
+          <h2 className="font-semibold">Record payment</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Paid on</Label><Input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} /></div>
+            <div className="space-y-2 md:col-span-2"><Label>Notes</Label><Input value={payNotes} onChange={(e) => setPayNotes(e.target.value)} /></div>
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground">Outstanding: {formatINR(outstanding)}. When paid in full the invoice locks automatically.</div>
+          <div className="mt-3 flex justify-end"><Button disabled={busy} onClick={recordPayment}>Record payment</Button></div>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-card p-5">
-        <h2 className="font-semibold">Payment</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select value={effectiveStatus} onValueChange={setStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unpaid">Unpaid</SelectItem>
-                <SelectItem value="partial">Partial</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Amount paid</Label>
-            <Input type="number" step="0.01"
-              value={amountPaid === "" ? inv.amount_paid : amountPaid}
-              onChange={(e) => setAmountPaid(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Payment date</Label>
-            <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Outstanding</Label>
-            <div className="rounded-md border bg-muted px-3 py-2 text-sm font-medium">{formatINR(outstanding)}</div>
-          </div>
-          <div className="space-y-2 md:col-span-4">
-            <Label>Notes</Label>
-            <Textarea rows={2} value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)}
-              placeholder={inv.payment_notes ?? ""} />
+        <h2 className="font-semibold">Payment history</h2>
+        {(payments as any[]).length === 0 ? <div className="mt-2 text-sm text-muted-foreground">No payments recorded.</div> :
+          <table className="mt-3 w-full text-sm">
+            <thead className="text-left text-xs uppercase text-muted-foreground"><tr><th>Date</th><th>Amount</th><th>Notes</th></tr></thead>
+            <tbody className="divide-y">
+              {(payments as any[]).map((p) => (
+                <tr key={p.id}><td className="py-2">{formatDate(p.paid_on)}</td><td>{formatINR(p.amount)}</td><td className="text-muted-foreground">{p.notes || "—"}</td></tr>
+              ))}
+            </tbody>
+          </table>}
+      </div>
+
+      {!locked && (
+        <div className="rounded-lg border bg-card p-5 space-y-3">
+          <h2 className="font-semibold">Cancel invoice</h2>
+          <p className="text-sm text-muted-foreground">Cancelling keeps the invoice number reserved but excludes it from revenue/outstanding.</p>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="md:col-span-2 space-y-2"><Label>Reason (optional)</Label><Textarea rows={2} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} /></div>
+            <div className="flex items-end"><Button variant="destructive" onClick={cancel}><Ban className="mr-2 h-4 w-4" /> Cancel invoice</Button></div>
           </div>
         </div>
-        <div className="mt-4 flex justify-between">
-          <Button variant="destructive" onClick={deleteInvoice}>Delete invoice</Button>
-          <Button onClick={savePayment} disabled={saving}>{saving ? "Saving…" : "Update payment"}</Button>
-        </div>
+      )}
+
+      <div className="flex justify-end">
+        <Button variant="ghost" className="text-destructive" onClick={deleteInvoice}>Delete permanently</Button>
       </div>
     </div>
   );
@@ -243,9 +253,5 @@ function InfoCard({ title, children }: { title: string; children: React.ReactNod
   );
 }
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div className={`flex justify-between ${bold ? "text-base font-bold" : ""}`}>
-      <span>{label}</span><span>{value}</span>
-    </div>
-  );
+  return (<div className={`flex justify-between ${bold ? "text-base font-bold" : ""}`}><span>{label}</span><span>{value}</span></div>);
 }
