@@ -14,127 +14,137 @@ export type Database = {
   }
   public: {
     Tables: {
-      customers: {
-        Row: {
-          address: string | null
-          created_at: string
-          id: string
-          name: string
-          phone: string | null
-          updated_at: string
-          vehicle_make_model: string | null
-          vehicle_reg: string | null
-        }
-        Insert: {
-          address?: string | null
-          created_at?: string
-          id?: string
-          name: string
-          phone?: string | null
-          updated_at?: string
-          vehicle_make_model?: string | null
-          vehicle_reg?: string | null
-        }
-        Update: {
-          address?: string | null
-          created_at?: string
-          id?: string
-          name?: string
-          phone?: string | null
-          updated_at?: string
-          vehicle_make_model?: string | null
-          vehicle_reg?: string | null
-        }
-        Relationships: []
-      }
       dealers: {
         Row: {
           address: string | null
           contact_person: string | null
           created_at: string
+          default_description: string | null
+          default_gst_rate: number | null
+          default_hsn_sac: string | null
+          default_rate: number | null
+          default_template_id: string | null
           email: string | null
           gstin: string | null
           id: string
-          invoice_name: string | null
           invoice_prefix: string
+          mobile: string | null
           name: string
           nickname: string | null
           notes: string | null
-          phone: string | null
-          state_code: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
           contact_person?: string | null
           created_at?: string
+          default_description?: string | null
+          default_gst_rate?: number | null
+          default_hsn_sac?: string | null
+          default_rate?: number | null
+          default_template_id?: string | null
           email?: string | null
           gstin?: string | null
           id?: string
-          invoice_name?: string | null
           invoice_prefix: string
+          mobile?: string | null
           name: string
           nickname?: string | null
           notes?: string | null
-          phone?: string | null
-          state_code?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
           contact_person?: string | null
           created_at?: string
+          default_description?: string | null
+          default_gst_rate?: number | null
+          default_hsn_sac?: string | null
+          default_rate?: number | null
+          default_template_id?: string | null
           email?: string | null
           gstin?: string | null
           id?: string
-          invoice_name?: string | null
           invoice_prefix?: string
+          mobile?: string | null
           name?: string
           nickname?: string | null
           notes?: string | null
-          phone?: string | null
-          state_code?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "dealers_default_template_fk"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      invoice_counters: {
+      invoice_payments: {
         Row: {
-          last_number: number
-          year: number
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_id: string
+          notes: string | null
+          paid_on: string
         }
         Insert: {
-          last_number?: number
-          year: number
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          paid_on?: string
         }
         Update: {
-          last_number?: number
-          year?: number
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          paid_on?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoice_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoice_templates: {
         Row: {
           created_at: string
           id: string
-          is_active: boolean
+          module: Database["public"]["Enums"]["invoice_module"]
           name: string
+          status: Database["public"]["Enums"]["template_status"]
           storage_path: string
           uploaded_by: string | null
         }
         Insert: {
           created_at?: string
           id?: string
-          is_active?: boolean
+          module: Database["public"]["Enums"]["invoice_module"]
           name: string
+          status?: Database["public"]["Enums"]["template_status"]
           storage_path: string
           uploaded_by?: string | null
         }
         Update: {
           created_at?: string
           id?: string
-          is_active?: boolean
+          module?: Database["public"]["Enums"]["invoice_module"]
           name?: string
+          status?: Database["public"]["Enums"]["template_status"]
           storage_path?: string
           uploaded_by?: string | null
         }
@@ -143,81 +153,101 @@ export type Database = {
       invoices: {
         Row: {
           amount_paid: number
+          cancelled_reason: string | null
           created_at: string
           created_by: string | null
-          customer_id: string | null
+          customer_address: string | null
+          customer_email: string | null
+          customer_gstin: string | null
+          customer_mobile: string | null
+          customer_name: string | null
           dealer_id: string | null
           docx_path: string | null
+          finalized_at: string | null
           gst_amount: number
           gst_rate: number
           id: string
           invoice_number: string
+          invoice_seq: number
           issue_date: string
           line_items: Json
+          module: Database["public"]["Enums"]["invoice_module"]
           notes: string | null
-          payment_date: string | null
-          payment_notes: string | null
           pdf_path: string | null
-          status: Database["public"]["Enums"]["payment_status"]
+          status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
           template_id: string | null
+          template_version: number | null
           total: number
+          transporter_id: string | null
           updated_at: string
+          vendor_id: string | null
         }
         Insert: {
           amount_paid?: number
+          cancelled_reason?: string | null
           created_at?: string
           created_by?: string | null
-          customer_id?: string | null
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_gstin?: string | null
+          customer_mobile?: string | null
+          customer_name?: string | null
           dealer_id?: string | null
           docx_path?: string | null
+          finalized_at?: string | null
           gst_amount?: number
           gst_rate?: number
           id?: string
           invoice_number: string
+          invoice_seq: number
           issue_date?: string
           line_items?: Json
+          module: Database["public"]["Enums"]["invoice_module"]
           notes?: string | null
-          payment_date?: string | null
-          payment_notes?: string | null
           pdf_path?: string | null
-          status?: Database["public"]["Enums"]["payment_status"]
+          status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
           template_id?: string | null
+          template_version?: number | null
           total?: number
+          transporter_id?: string | null
           updated_at?: string
+          vendor_id?: string | null
         }
         Update: {
           amount_paid?: number
+          cancelled_reason?: string | null
           created_at?: string
           created_by?: string | null
-          customer_id?: string | null
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_gstin?: string | null
+          customer_mobile?: string | null
+          customer_name?: string | null
           dealer_id?: string | null
           docx_path?: string | null
+          finalized_at?: string | null
           gst_amount?: number
           gst_rate?: number
           id?: string
           invoice_number?: string
+          invoice_seq?: number
           issue_date?: string
           line_items?: Json
+          module?: Database["public"]["Enums"]["invoice_module"]
           notes?: string | null
-          payment_date?: string | null
-          payment_notes?: string | null
           pdf_path?: string | null
-          status?: Database["public"]["Enums"]["payment_status"]
+          status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
           template_id?: string | null
+          template_version?: number | null
           total?: number
+          transporter_id?: string | null
           updated_at?: string
+          vendor_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "invoices_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "invoices_dealer_id_fkey"
             columns: ["dealer_id"]
@@ -232,7 +262,39 @@ export type Database = {
             referencedRelation: "invoice_templates"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "invoices_transporter_id_fkey"
+            columns: ["transporter_id"]
+            isOneToOne: false
+            referencedRelation: "transporters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      module_settings: {
+        Row: {
+          invoice_prefix: string
+          module: Database["public"]["Enums"]["invoice_module"]
+          updated_at: string
+        }
+        Insert: {
+          invoice_prefix: string
+          module: Database["public"]["Enums"]["invoice_module"]
+          updated_at?: string
+        }
+        Update: {
+          invoice_prefix?: string
+          module?: Database["public"]["Enums"]["invoice_module"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -252,6 +314,74 @@ export type Database = {
         }
         Relationships: []
       }
+      transporters: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          created_at: string
+          default_description: string | null
+          default_gst_rate: number | null
+          default_hsn_sac: string | null
+          default_rate: number | null
+          default_template_id: string | null
+          email: string | null
+          gstin: string | null
+          id: string
+          invoice_prefix: string
+          mobile: string | null
+          name: string
+          nickname: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          default_description?: string | null
+          default_gst_rate?: number | null
+          default_hsn_sac?: string | null
+          default_rate?: number | null
+          default_template_id?: string | null
+          email?: string | null
+          gstin?: string | null
+          id?: string
+          invoice_prefix: string
+          mobile?: string | null
+          name: string
+          nickname?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          default_description?: string | null
+          default_gst_rate?: number | null
+          default_hsn_sac?: string | null
+          default_rate?: number | null
+          default_template_id?: string | null
+          email?: string | null
+          gstin?: string | null
+          id?: string
+          invoice_prefix?: string
+          mobile?: string | null
+          name?: string
+          nickname?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transporters_default_template_fk"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -270,6 +400,74 @@ export type Database = {
         }
         Relationships: []
       }
+      vendors: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          created_at: string
+          default_description: string | null
+          default_gst_rate: number | null
+          default_hsn_sac: string | null
+          default_rate: number | null
+          default_template_id: string | null
+          email: string | null
+          gstin: string | null
+          id: string
+          invoice_prefix: string
+          mobile: string | null
+          name: string
+          nickname: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          default_description?: string | null
+          default_gst_rate?: number | null
+          default_hsn_sac?: string | null
+          default_rate?: number | null
+          default_template_id?: string | null
+          email?: string | null
+          gstin?: string | null
+          id?: string
+          invoice_prefix: string
+          mobile?: string | null
+          name: string
+          nickname?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          default_description?: string | null
+          default_gst_rate?: number | null
+          default_hsn_sac?: string | null
+          default_rate?: number | null
+          default_template_id?: string | null
+          email?: string | null
+          gstin?: string | null
+          id?: string
+          invoice_prefix?: string
+          mobile?: string | null
+          name?: string
+          nickname?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendors_default_template_fk"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -282,15 +480,28 @@ export type Database = {
         }
         Returns: boolean
       }
-      next_invoice_number: { Args: never; Returns: string }
-      next_invoice_number_for_dealer: {
-        Args: { _dealer_id: string }
-        Returns: string
+      missing_invoice_seqs: {
+        Args: {
+          _dealer_id: string
+          _module: Database["public"]["Enums"]["invoice_module"]
+        }
+        Returns: {
+          missing_seq: number
+        }[]
+      }
+      next_invoice_seq: {
+        Args: {
+          _dealer_id: string
+          _module: Database["public"]["Enums"]["invoice_module"]
+        }
+        Returns: number
       }
     }
     Enums: {
       app_role: "admin" | "user"
-      payment_status: "unpaid" | "partial" | "paid"
+      invoice_module: "dealer" | "vendor" | "transporter" | "customer"
+      invoice_status: "draft" | "pending" | "partial" | "paid" | "cancelled"
+      template_status: "active" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -419,7 +630,9 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
-      payment_status: ["unpaid", "partial", "paid"],
+      invoice_module: ["dealer", "vendor", "transporter", "customer"],
+      invoice_status: ["draft", "pending", "partial", "paid", "cancelled"],
+      template_status: ["active", "archived"],
     },
   },
 } as const
