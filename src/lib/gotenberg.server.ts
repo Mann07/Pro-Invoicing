@@ -10,7 +10,7 @@ export async function convertDocxToPdf(docx: Uint8Array | ArrayBuffer, filename 
 
   const bytes = docx instanceof Uint8Array ? docx : new Uint8Array(docx);
   const form = new FormData();
-  const blob = new Blob([bytes], {
+  const blob = new Blob([bytes as unknown as BlobPart], {
     type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   });
   form.append("files", blob, filename);
