@@ -21,6 +21,8 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedDealersRouteImport } from './routes/_authenticated/dealers'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedVendorsIdRouteImport } from './routes/_authenticated/vendors.$id'
+import { Route as AuthenticatedTransportersIdRouteImport } from './routes/_authenticated/transporters.$id'
 import { Route as AuthenticatedInvoicesNewRouteImport } from './routes/_authenticated/invoices.new'
 import { Route as AuthenticatedInvoicesIdRouteImport } from './routes/_authenticated/invoices.$id'
 import { Route as AuthenticatedDealersIdRouteImport } from './routes/_authenticated/dealers.$id'
@@ -85,6 +87,17 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedVendorsIdRoute = AuthenticatedVendorsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedVendorsRoute,
+} as any)
+const AuthenticatedTransportersIdRoute =
+  AuthenticatedTransportersIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedTransportersRoute,
+  } as any)
 const AuthenticatedInvoicesNewRoute =
   AuthenticatedInvoicesNewRouteImport.update({
     id: '/invoices/new',
@@ -112,11 +125,13 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/templates': typeof AuthenticatedTemplatesRoute
-  '/transporters': typeof AuthenticatedTransportersRoute
-  '/vendors': typeof AuthenticatedVendorsRoute
+  '/transporters': typeof AuthenticatedTransportersRouteWithChildren
+  '/vendors': typeof AuthenticatedVendorsRouteWithChildren
   '/dealers/$id': typeof AuthenticatedDealersIdRoute
   '/invoices/$id': typeof AuthenticatedInvoicesIdRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
+  '/transporters/$id': typeof AuthenticatedTransportersIdRoute
+  '/vendors/$id': typeof AuthenticatedVendorsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -128,11 +143,13 @@ export interface FileRoutesByTo {
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/templates': typeof AuthenticatedTemplatesRoute
-  '/transporters': typeof AuthenticatedTransportersRoute
-  '/vendors': typeof AuthenticatedVendorsRoute
+  '/transporters': typeof AuthenticatedTransportersRouteWithChildren
+  '/vendors': typeof AuthenticatedVendorsRouteWithChildren
   '/dealers/$id': typeof AuthenticatedDealersIdRoute
   '/invoices/$id': typeof AuthenticatedInvoicesIdRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
+  '/transporters/$id': typeof AuthenticatedTransportersIdRoute
+  '/vendors/$id': typeof AuthenticatedVendorsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -146,11 +163,13 @@ export interface FileRoutesById {
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
-  '/_authenticated/transporters': typeof AuthenticatedTransportersRoute
-  '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
+  '/_authenticated/transporters': typeof AuthenticatedTransportersRouteWithChildren
+  '/_authenticated/vendors': typeof AuthenticatedVendorsRouteWithChildren
   '/_authenticated/dealers/$id': typeof AuthenticatedDealersIdRoute
   '/_authenticated/invoices/$id': typeof AuthenticatedInvoicesIdRoute
   '/_authenticated/invoices/new': typeof AuthenticatedInvoicesNewRoute
+  '/_authenticated/transporters/$id': typeof AuthenticatedTransportersIdRoute
+  '/_authenticated/vendors/$id': typeof AuthenticatedVendorsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -169,6 +188,8 @@ export interface FileRouteTypes {
     | '/dealers/$id'
     | '/invoices/$id'
     | '/invoices/new'
+    | '/transporters/$id'
+    | '/vendors/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -185,6 +206,8 @@ export interface FileRouteTypes {
     | '/dealers/$id'
     | '/invoices/$id'
     | '/invoices/new'
+    | '/transporters/$id'
+    | '/vendors/$id'
   id:
     | '__root__'
     | '/'
@@ -202,6 +225,8 @@ export interface FileRouteTypes {
     | '/_authenticated/dealers/$id'
     | '/_authenticated/invoices/$id'
     | '/_authenticated/invoices/new'
+    | '/_authenticated/transporters/$id'
+    | '/_authenticated/vendors/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -298,6 +323,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/vendors/$id': {
+      id: '/_authenticated/vendors/$id'
+      path: '/$id'
+      fullPath: '/vendors/$id'
+      preLoaderRoute: typeof AuthenticatedVendorsIdRouteImport
+      parentRoute: typeof AuthenticatedVendorsRoute
+    }
+    '/_authenticated/transporters/$id': {
+      id: '/_authenticated/transporters/$id'
+      path: '/$id'
+      fullPath: '/transporters/$id'
+      preLoaderRoute: typeof AuthenticatedTransportersIdRouteImport
+      parentRoute: typeof AuthenticatedTransportersRoute
+    }
     '/_authenticated/invoices/new': {
       id: '/_authenticated/invoices/new'
       path: '/invoices/new'
@@ -333,14 +372,39 @@ const AuthenticatedDealersRouteChildren: AuthenticatedDealersRouteChildren = {
 const AuthenticatedDealersRouteWithChildren =
   AuthenticatedDealersRoute._addFileChildren(AuthenticatedDealersRouteChildren)
 
+interface AuthenticatedTransportersRouteChildren {
+  AuthenticatedTransportersIdRoute: typeof AuthenticatedTransportersIdRoute
+}
+
+const AuthenticatedTransportersRouteChildren: AuthenticatedTransportersRouteChildren =
+  {
+    AuthenticatedTransportersIdRoute: AuthenticatedTransportersIdRoute,
+  }
+
+const AuthenticatedTransportersRouteWithChildren =
+  AuthenticatedTransportersRoute._addFileChildren(
+    AuthenticatedTransportersRouteChildren,
+  )
+
+interface AuthenticatedVendorsRouteChildren {
+  AuthenticatedVendorsIdRoute: typeof AuthenticatedVendorsIdRoute
+}
+
+const AuthenticatedVendorsRouteChildren: AuthenticatedVendorsRouteChildren = {
+  AuthenticatedVendorsIdRoute: AuthenticatedVendorsIdRoute,
+}
+
+const AuthenticatedVendorsRouteWithChildren =
+  AuthenticatedVendorsRoute._addFileChildren(AuthenticatedVendorsRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDealersRoute: typeof AuthenticatedDealersRouteWithChildren
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
-  AuthenticatedTransportersRoute: typeof AuthenticatedTransportersRoute
-  AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRoute
+  AuthenticatedTransportersRoute: typeof AuthenticatedTransportersRouteWithChildren
+  AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRouteWithChildren
   AuthenticatedInvoicesIdRoute: typeof AuthenticatedInvoicesIdRoute
   AuthenticatedInvoicesNewRoute: typeof AuthenticatedInvoicesNewRoute
 }
@@ -351,8 +415,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
-  AuthenticatedTransportersRoute: AuthenticatedTransportersRoute,
-  AuthenticatedVendorsRoute: AuthenticatedVendorsRoute,
+  AuthenticatedTransportersRoute: AuthenticatedTransportersRouteWithChildren,
+  AuthenticatedVendorsRoute: AuthenticatedVendorsRouteWithChildren,
   AuthenticatedInvoicesIdRoute: AuthenticatedInvoicesIdRoute,
   AuthenticatedInvoicesNewRoute: AuthenticatedInvoicesNewRoute,
 }
