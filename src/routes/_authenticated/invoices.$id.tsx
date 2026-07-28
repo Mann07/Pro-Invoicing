@@ -32,6 +32,7 @@ function InvoiceDetail() {
   const dlFn = useServerFn(getInvoiceDownloadUrl);
   const payFn = useServerFn(addPayment);
   const cancelFn = useServerFn(cancelInvoice);
+  const regenFn = useServerFn(regeneratePdf);
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ["invoice", id],
