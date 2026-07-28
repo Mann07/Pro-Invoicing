@@ -173,7 +173,10 @@ export type Database = {
           line_items: Json
           module: Database["public"]["Enums"]["invoice_module"]
           notes: string | null
+          pdf_error: string | null
+          pdf_generated_at: string | null
           pdf_path: string | null
+          pdf_status: Database["public"]["Enums"]["pdf_status"]
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
           template_id: string | null
@@ -205,7 +208,10 @@ export type Database = {
           line_items?: Json
           module: Database["public"]["Enums"]["invoice_module"]
           notes?: string | null
+          pdf_error?: string | null
+          pdf_generated_at?: string | null
           pdf_path?: string | null
+          pdf_status?: Database["public"]["Enums"]["pdf_status"]
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
           template_id?: string | null
@@ -237,7 +243,10 @@ export type Database = {
           line_items?: Json
           module?: Database["public"]["Enums"]["invoice_module"]
           notes?: string | null
+          pdf_error?: string | null
+          pdf_generated_at?: string | null
           pdf_path?: string | null
+          pdf_status?: Database["public"]["Enums"]["pdf_status"]
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
           template_id?: string | null
@@ -501,6 +510,7 @@ export type Database = {
       app_role: "admin" | "user"
       invoice_module: "dealer" | "vendor" | "transporter" | "customer"
       invoice_status: "draft" | "pending" | "partial" | "paid" | "cancelled"
+      pdf_status: "pending" | "processing" | "ready" | "failed"
       template_status: "active" | "archived"
     }
     CompositeTypes: {
@@ -632,6 +642,7 @@ export const Constants = {
       app_role: ["admin", "user"],
       invoice_module: ["dealer", "vendor", "transporter", "customer"],
       invoice_status: ["draft", "pending", "partial", "paid", "cancelled"],
+      pdf_status: ["pending", "processing", "ready", "failed"],
       template_status: ["active", "archived"],
     },
   },
