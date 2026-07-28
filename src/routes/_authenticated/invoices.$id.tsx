@@ -3,14 +3,14 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, FileText, FileDown, Ban, Lock } from "lucide-react";
+import { ArrowLeft, FileText, FileDown, Ban, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { addPayment, cancelInvoice, getInvoiceDownloadUrl } from "@/lib/invoice.functions";
+import { addPayment, cancelInvoice, getInvoiceDownloadUrl, regeneratePdf } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
@@ -32,6 +32,7 @@ function InvoiceDetail() {
   const dlFn = useServerFn(getInvoiceDownloadUrl);
   const payFn = useServerFn(addPayment);
   const cancelFn = useServerFn(cancelInvoice);
+  const regenFn = useServerFn(regeneratePdf);
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -77,11 +78,24 @@ function InvoiceDetail() {
     } catch (e: any) { toast.error(e.message); }
   }
   async function downloadPdf() {
-    if (!inv.pdf_path) return toast.error("No PDF generated. Check that Gotenberg is reachable and re-create the invoice.");
+    if (!inv.pdf_path) return toast.error("No PDF yet — click 'Generate PDF'.");
     try {
       const { url } = await dlFn({ data: { path: inv.pdf_path } });
       window.open(url, "_blank");
     } catch (e: any) { toast.error(e.message); }
+  }
+  const [regenBusy, setRegenBusy] = useState(false);
+  async function regenerate() {
+    if (regenBusy) return;
+    setRegenBusy(true);
+    const t = toast.loading("Converting DOCX to PDF…");
+    try {
+      await regenFn({ data: { invoice_id: id } });
+      toast.success("PDF generated", { id: t });
+      qc.invalidateQueries({ queryKey: ["invoice", id] });
+    } catch (e: any) {
+      toast.error(e.message ?? "PDF conversion failed", { id: t });
+    } finally { setRegenBusy(false); }
   }
 
   async function recordPayment() {
@@ -130,9 +144,21 @@ function InvoiceDetail() {
             <p className="text-sm text-muted-foreground">Issued {formatDate(inv.issue_date)}</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={downloadDocx}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
-          <Button onClick={downloadPdf}><FileDown className="mr-2 h-4 w-4" /> PDF</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={downloadDocx} disabled={!inv.docx_path}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
+          {inv.pdf_status === "ready" && inv.pdf_path ? (
+            <Button onClick={downloadPdf}><FileDown className="mr-2 h-4 w-4" /> PDF</Button>
+          ) : (
+            <Button onClick={regenerate} disabled={regenBusy || !inv.docx_path}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${regenBusy ? "animate-spin" : ""}`} />
+              {inv.pdf_status === "failed" ? "Retry PDF" : "Generate PDF"}
+            </Button>
+          )}
+          {inv.pdf_status === "ready" && !locked && (
+            <Button variant="outline" onClick={regenerate} disabled={regenBusy}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${regenBusy ? "animate-spin" : ""}`} /> Regenerate
+            </Button>
+          )}
         </div>
       </div>
 
@@ -158,7 +184,17 @@ function InvoiceDetail() {
         <InfoCard title="Documents">
           <div className="text-sm text-muted-foreground">Template version: {inv.template_version ?? "—"}</div>
           <div className="text-sm text-muted-foreground">DOCX: {inv.docx_path ? "stored" : "not generated"}</div>
-          <div className="text-sm text-muted-foreground">PDF: {inv.pdf_path ? "stored" : "not generated"}</div>
+          <div className="text-sm">
+            PDF:{" "}
+            <span className={
+              inv.pdf_status === "ready" ? "text-success font-medium"
+              : inv.pdf_status === "failed" ? "text-destructive font-medium"
+              : inv.pdf_status === "processing" ? "text-warning font-medium"
+              : "text-muted-foreground"
+            }>{inv.pdf_status ?? "pending"}</span>
+          </div>
+          {inv.pdf_generated_at && <div className="text-sm text-muted-foreground">Converted: {formatDate(inv.pdf_generated_at)}</div>}
+          {inv.pdf_error && <div className="mt-1 text-xs text-destructive">Last error: {inv.pdf_error}</div>}
           {inv.finalized_at && <div className="text-sm text-muted-foreground">Finalized: {formatDate(inv.finalized_at)}</div>}
           {inv.cancelled_reason && <div className="text-sm text-muted-foreground">Cancelled: {inv.cancelled_reason}</div>}
         </InfoCard>

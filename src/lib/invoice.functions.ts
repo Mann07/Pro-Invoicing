@@ -202,18 +202,31 @@ export const createInvoice = createServerFn({ method: "POST" })
         });
       if (upErr) throw new Error(`DOCX upload failed: ${upErr.message}`);
 
-      // Convert to PDF via Gotenberg
+    }
+
+    // Convert to PDF via iLovePDF (deferred until after we have DOCX bytes).
+    let pdf_status: "pending" | "ready" | "failed" = "pending";
+    let pdf_error: string | null = null;
+    let pdf_generated_at: string | null = null;
+    if (docx_path) {
       try {
-        const { convertDocxToPdf } = await import("@/lib/gotenberg.server");
-        const pdf = await convertDocxToPdf(rendered, `${invoice_number}.docx`);
+        const { convertDocxToPdf } = await import("@/lib/pdf-conversion.server");
+        const { data: dl, error: dErr } = await sb.storage.from("invoices").download(docx_path);
+        if (dErr) throw new Error(dErr.message);
+        const bytes = new Uint8Array(await dl.arrayBuffer());
+        const pdf = await convertDocxToPdf(bytes, `${invoice_number}.docx`);
         pdf_path = `${userId}/${data.module}/${invoice_number}.pdf`;
         const { error: pdfErr } = await sb.storage
           .from("invoices")
           .upload(pdf_path, pdf, { contentType: "application/pdf", upsert: true });
         if (pdfErr) throw new Error(pdfErr.message);
+        pdf_status = "ready";
+        pdf_generated_at = new Date().toISOString();
       } catch (e: any) {
-        // Roll back: keep DOCX but fail loudly so caller knows PDF is missing.
-        throw new Error(`PDF conversion failed: ${e?.message ?? e}`);
+        // Do NOT fail the invoice — keep DOCX; user can retry from the detail page.
+        pdf_status = "failed";
+        pdf_error = e?.message ?? String(e);
+        pdf_path = null;
       }
     }
 
@@ -239,6 +252,9 @@ export const createInvoice = createServerFn({ method: "POST" })
       status: "pending",
       docx_path,
       pdf_path,
+      pdf_status,
+      pdf_generated_at,
+      pdf_error,
       template_id: templateId,
       template_version,
       created_by: userId,
@@ -352,4 +368,49 @@ export const listMissingSeqs = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     return { missing: ((rows ?? []) as Array<{ missing_seq: number }>).map((r) => r.missing_seq) };
+  });
+
+/* ------------------------------------------------------------------ */
+/* Regenerate PDF from stored DOCX (for retry after failed conversion) */
+/* ------------------------------------------------------------------ */
+
+export const regeneratePdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ invoice_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const sb = (context.supabase as any);
+    const { data: inv, error } = await sb.from("invoices").select("*").eq("id", data.invoice_id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!inv) throw new Error("Invoice not found");
+    if (!inv.docx_path) throw new Error("No DOCX on file — cannot generate PDF");
+    if (inv.pdf_status === "processing") throw new Error("PDF conversion already in progress");
+
+    await sb.from("invoices").update({ pdf_status: "processing", pdf_error: null }).eq("id", data.invoice_id);
+
+    try {
+      const { convertDocxToPdf } = await import("@/lib/pdf-conversion.server");
+      const { data: dl, error: dErr } = await sb.storage.from("invoices").download(inv.docx_path);
+      if (dErr) throw new Error(dErr.message);
+      const bytes = new Uint8Array(await dl.arrayBuffer());
+      const pdf = await convertDocxToPdf(bytes, `${inv.invoice_number}.docx`);
+      const pdf_path = `${inv.created_by}/${inv.module}/${inv.invoice_number}.pdf`;
+      const { error: upErr } = await sb.storage.from("invoices").upload(pdf_path, pdf, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+      if (upErr) throw new Error(upErr.message);
+      await sb.from("invoices").update({
+        pdf_path,
+        pdf_status: "ready",
+        pdf_generated_at: new Date().toISOString(),
+        pdf_error: null,
+      }).eq("id", data.invoice_id);
+      return { ok: true };
+    } catch (e: any) {
+      await sb.from("invoices").update({
+        pdf_status: "failed",
+        pdf_error: e?.message ?? String(e),
+      }).eq("id", data.invoice_id);
+      throw new Error(e?.message ?? "PDF conversion failed");
+    }
   });
