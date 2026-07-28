@@ -3,14 +3,14 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, FileText, FileDown, Ban, Lock } from "lucide-react";
+import { ArrowLeft, FileText, FileDown, Ban, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { addPayment, cancelInvoice, getInvoiceDownloadUrl } from "@/lib/invoice.functions";
+import { addPayment, cancelInvoice, getInvoiceDownloadUrl, regeneratePdf } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
