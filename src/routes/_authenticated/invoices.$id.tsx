@@ -184,7 +184,17 @@ function InvoiceDetail() {
         <InfoCard title="Documents">
           <div className="text-sm text-muted-foreground">Template version: {inv.template_version ?? "—"}</div>
           <div className="text-sm text-muted-foreground">DOCX: {inv.docx_path ? "stored" : "not generated"}</div>
-          <div className="text-sm text-muted-foreground">PDF: {inv.pdf_path ? "stored" : "not generated"}</div>
+          <div className="text-sm">
+            PDF:{" "}
+            <span className={
+              inv.pdf_status === "ready" ? "text-success font-medium"
+              : inv.pdf_status === "failed" ? "text-destructive font-medium"
+              : inv.pdf_status === "processing" ? "text-warning font-medium"
+              : "text-muted-foreground"
+            }>{inv.pdf_status ?? "pending"}</span>
+          </div>
+          {inv.pdf_generated_at && <div className="text-sm text-muted-foreground">Converted: {formatDate(inv.pdf_generated_at)}</div>}
+          {inv.pdf_error && <div className="mt-1 text-xs text-destructive">Last error: {inv.pdf_error}</div>}
           {inv.finalized_at && <div className="text-sm text-muted-foreground">Finalized: {formatDate(inv.finalized_at)}</div>}
           {inv.cancelled_reason && <div className="text-sm text-muted-foreground">Cancelled: {inv.cancelled_reason}</div>}
         </InfoCard>
