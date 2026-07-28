@@ -78,11 +78,24 @@ function InvoiceDetail() {
     } catch (e: any) { toast.error(e.message); }
   }
   async function downloadPdf() {
-    if (!inv.pdf_path) return toast.error("No PDF generated. Check that Gotenberg is reachable and re-create the invoice.");
+    if (!inv.pdf_path) return toast.error("No PDF yet — click 'Generate PDF'.");
     try {
       const { url } = await dlFn({ data: { path: inv.pdf_path } });
       window.open(url, "_blank");
     } catch (e: any) { toast.error(e.message); }
+  }
+  const [regenBusy, setRegenBusy] = useState(false);
+  async function regenerate() {
+    if (regenBusy) return;
+    setRegenBusy(true);
+    const t = toast.loading("Converting DOCX to PDF…");
+    try {
+      await regenFn({ data: { invoice_id: id } });
+      toast.success("PDF generated", { id: t });
+      qc.invalidateQueries({ queryKey: ["invoice", id] });
+    } catch (e: any) {
+      toast.error(e.message ?? "PDF conversion failed", { id: t });
+    } finally { setRegenBusy(false); }
   }
 
   async function recordPayment() {
