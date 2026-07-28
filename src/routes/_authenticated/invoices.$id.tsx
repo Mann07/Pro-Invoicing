@@ -144,9 +144,21 @@ function InvoiceDetail() {
             <p className="text-sm text-muted-foreground">Issued {formatDate(inv.issue_date)}</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={downloadDocx}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
-          <Button onClick={downloadPdf}><FileDown className="mr-2 h-4 w-4" /> PDF</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={downloadDocx} disabled={!inv.docx_path}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
+          {inv.pdf_status === "ready" && inv.pdf_path ? (
+            <Button onClick={downloadPdf}><FileDown className="mr-2 h-4 w-4" /> PDF</Button>
+          ) : (
+            <Button onClick={regenerate} disabled={regenBusy || !inv.docx_path}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${regenBusy ? "animate-spin" : ""}`} />
+              {inv.pdf_status === "failed" ? "Retry PDF" : "Generate PDF"}
+            </Button>
+          )}
+          {inv.pdf_status === "ready" && !locked && (
+            <Button variant="outline" onClick={regenerate} disabled={regenBusy}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${regenBusy ? "animate-spin" : ""}`} /> Regenerate
+            </Button>
+          )}
         </div>
       </div>
 
