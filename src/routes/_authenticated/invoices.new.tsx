@@ -49,13 +49,26 @@ function NewInvoice() {
   const [gstRate, setGstRate] = useState<number>(18);
   const [gstEnabled, setGstEnabled] = useState(true);
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<Line[]>([{ description: "", hsn_sac: "", qty: 1, rate: 0, amount: 0 }]);
+  const [items, setItems] = useState<Line[]>([{ description: "", hsn_sac: "", qty: 0, rate: 0, amount: 0 }]);
   const [busy, setBusy] = useState(false);
+  const [numberEdited, setNumberEdited] = useState(false);
 
   const selectedParty = useMemo(() => (parties as any[]).find((p) => p.id === partyId), [parties, partyId]);
 
+  // Next invoice number preview (per module / selected party)
+  const { data: nextNum } = useQuery({
+    queryKey: ["next-invoice-number", module, partyId || "none"],
+    queryFn: () => nextNumFn({ data: { module, party_id: module === "customer" ? null : (partyId || null) } }),
+    enabled: module === "customer" || !!partyId,
+  });
+
+  // Prefill the invoice number field unless the user typed their own
+  useEffect(() => {
+    if (!numberEdited && nextNum?.invoice_number) setInvoiceNumber(nextNum.invoice_number);
+  }, [nextNum?.invoice_number, numberEdited]);
+
   // Reset party selection when module changes
-  useEffect(() => { setPartyId(""); setInvoiceNumber(""); setTemplateId(""); }, [module]);
+  useEffect(() => { setPartyId(""); setInvoiceNumber(""); setTemplateId(""); setNumberEdited(false); }, [module]);
 
   // Apply party defaults to first line
   useEffect(() => {
@@ -63,13 +76,14 @@ function NewInvoice() {
     setItems((prev) => prev.map((it, i) => i === 0 ? {
       description: it.description || selectedParty.default_description || "",
       hsn_sac: it.hsn_sac || selectedParty.default_hsn_sac || "",
-      qty: it.qty || 1,
+      qty: it.qty,
       rate: it.rate || Number(selectedParty.default_rate ?? 0),
       amount: 0,
     } : it));
     if (selectedParty.default_gst_rate != null) setGstRate(Number(selectedParty.default_gst_rate));
     if (selectedParty.default_template_id) setTemplateId(selectedParty.default_template_id);
   }, [selectedParty]);
+
 
   // Recompute amounts
   useEffect(() => {
