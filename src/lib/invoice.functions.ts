@@ -515,7 +515,7 @@ export const invalidateInvoicePdf = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
     const { data: inv } = await sb.from("invoices").select("pdf_path").eq("id", data.invoice_id).maybeSingle();
-    if (inv?.pdf_path) await sb.storage.from("invoices").remove([inv.pdf_path]).catch?.(() => {});
+    if (inv?.pdf_path) { try { await sb.storage.from("invoices").remove([inv.pdf_path]); } catch { /* ignore */ } }
     const { error } = await sb.from("invoices").update({
       pdf_path: null,
       pdf_status: "pending",
