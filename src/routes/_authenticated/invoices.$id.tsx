@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { addPayment, cancelInvoice, getInvoiceDownloadUrl, regeneratePdf } from "@/lib/invoice.functions";
+import { addPayment, cancelInvoice, getInvoiceDownloadUrl, ensureInvoicePdf } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
