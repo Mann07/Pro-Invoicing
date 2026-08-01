@@ -163,17 +163,30 @@ function NewInvoice() {
               <SelectTrigger><SelectValue placeholder={`Select ${module}`} /></SelectTrigger>
               <SelectContent>
                 {(parties as any[]).map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{(d.nickname ?? d.name)} · {d.invoice_prefix}</SelectItem>
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {selectedParty && (
+              <div className="rounded-md bg-muted p-3 text-sm">
+                <div><span className="text-muted-foreground">Dealer: </span><span className="font-medium">{selectedParty.name}</span></div>
+                <div><span className="text-muted-foreground">Invoice prefix: </span><span className="font-medium">{selectedParty.invoice_prefix}</span></div>
+                <div><span className="text-muted-foreground">Invoice number: </span><span className="font-medium">{nextNum?.invoice_number ?? "…"}</span></div>
+              </div>
+            )}
           </div>
         )}
         <div className="space-y-2"><Label>Issue date</Label><Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} required /></div>
         <div className="space-y-2 md:col-span-2">
-          <Label>Invoice number (auto if blank)</Label>
-          <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Leave blank to auto-generate" />
+          <Label>Invoice number</Label>
+          <Input
+            value={invoiceNumber}
+            onChange={(e) => { setNumberEdited(true); setInvoiceNumber(e.target.value); }}
+            placeholder="Invoice number"
+          />
+          <p className="text-xs text-muted-foreground">Auto-filled with the next number; editable if you need a custom one.</p>
         </div>
+
         <div className="space-y-2">
           <Label>Template</Label>
           <Select value={templateId} onValueChange={setTemplateId}>
