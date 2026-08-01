@@ -63,6 +63,7 @@ function InvoiceDetail() {
   const [payNotes, setPayNotes] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [regenBusy, setRegenBusy] = useState(false);
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading…</div>;
   if (!inv) return <div className="p-6">Not found. <Link to="/dashboard" className="text-primary underline">Back</Link></div>;
@@ -84,7 +85,6 @@ function InvoiceDetail() {
       window.open(url, "_blank");
     } catch (e: any) { toast.error(e.message); }
   }
-  const [regenBusy, setRegenBusy] = useState(false);
   async function regenerate() {
     if (regenBusy) return;
     setRegenBusy(true);
