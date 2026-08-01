@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { createInvoice } from "@/lib/invoice.functions";
+import { createInvoice, getNextInvoiceNumber } from "@/lib/invoice.functions";
 import { formatINR, todayISO, toIndianWordsINR } from "@/lib/format";
 import { MODULES, type ModuleId } from "@/lib/modules";
 
