@@ -110,7 +110,7 @@ function NewInvoice() {
     if (module !== "customer" && !partyId) return toast.error(`Select a ${module}`);
     if (module === "customer" && !customer.name) return toast.error("Customer name is required");
     setBusy(true);
-    const t = toast.loading("Generating Word document & converting to PDF…");
+    const t = toast.loading("Generating Word document…");
     try {
       const res = await createFn({
         data: {
