@@ -109,9 +109,26 @@ export const createInvoice = createServerFn({ method: "POST" })
       _dealer_id: dealerScope,
     });
     if (seqErr) throw new Error(seqErr.message);
-    const seq = Number(seqRes);
-    const invoice_number =
-      (data.invoice_number && data.invoice_number.trim()) || `${modulePrefix}${String(seq).padStart(4, "0")}`;
+    let seq = Number(seqRes);
+    const manual = data.invoice_number?.trim() || "";
+    const invoice_number = manual || `${modulePrefix}${String(seq).padStart(4, "0")}`;
+
+    if (manual) {
+      // Uniqueness (global — invoice numbers are user-visible identifiers)
+      const { data: dupe } = await sb
+        .from("invoices")
+        .select("id")
+        .eq("invoice_number", manual)
+        .maybeSingle();
+      if (dupe) throw new Error(`Invoice number ${manual} already exists`);
+      // Keep future numbering ahead of any manually entered higher number
+      const digits = manual.match(/(\d+)\s*$/);
+      if (digits) {
+        const n = Number(digits[1]);
+        if (Number.isFinite(n) && n >= seq) seq = n;
+      }
+    }
+
 
     // Template — user-picked, or fall back to party default, or any active for module
     let templateId: string | null = data.template_id ?? party?.default_template_id ?? null;
@@ -204,31 +221,12 @@ export const createInvoice = createServerFn({ method: "POST" })
 
     }
 
-    // Convert to PDF via iLovePDF (deferred until after we have DOCX bytes).
-    let pdf_status: "pending" | "ready" | "failed" = "pending";
-    let pdf_error: string | null = null;
-    let pdf_generated_at: string | null = null;
-    if (docx_path) {
-      try {
-        const { convertDocxToPdf } = await import("@/lib/pdf-conversion.server");
-        const { data: dl, error: dErr } = await sb.storage.from("invoices").download(docx_path);
-        if (dErr) throw new Error(dErr.message);
-        const bytes = new Uint8Array(await dl.arrayBuffer());
-        const pdf = await convertDocxToPdf(bytes, `${invoice_number}.docx`);
-        pdf_path = `${userId}/${data.module}/${invoice_number}.pdf`;
-        const { error: pdfErr } = await sb.storage
-          .from("invoices")
-          .upload(pdf_path, pdf, { contentType: "application/pdf", upsert: true });
-        if (pdfErr) throw new Error(pdfErr.message);
-        pdf_status = "ready";
-        pdf_generated_at = new Date().toISOString();
-      } catch (e: any) {
-        // Do NOT fail the invoice — keep DOCX; user can retry from the detail page.
-        pdf_status = "failed";
-        pdf_error = e?.message ?? String(e);
-        pdf_path = null;
-      }
-    }
+    // PDF is generated on demand (first "Download PDF" click), not at creation time.
+    const pdf_status: "pending" | "ready" | "failed" = "pending";
+    const pdf_error: string | null = null;
+    const pdf_generated_at: string | null = null;
+    pdf_path = null;
+
 
     const insertRow: any = {
       module: data.module,
@@ -413,4 +411,117 @@ export const regeneratePdf = createServerFn({ method: "POST" })
       }).eq("id", data.invoice_id);
       throw new Error(e?.message ?? "PDF conversion failed");
     }
+  });
+
+/* ------------------------------------------------------------------ */
+/* Next invoice number preview (per module / dealer)                   */
+/* ------------------------------------------------------------------ */
+
+export const getNextInvoiceNumber = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      module: ModuleEnum,
+      party_id: z.string().uuid().nullable().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+
+    let prefix = "";
+    if (data.module === "customer") {
+      const { data: s } = await sb.from("module_settings").select("invoice_prefix").eq("module", "customer").maybeSingle();
+      prefix = s?.invoice_prefix ?? "CUS-";
+    } else {
+      if (!data.party_id) return { prefix: "", seq: null as number | null, invoice_number: "" };
+      const table = data.module === "dealer" ? "dealers" : data.module === "vendor" ? "vendors" : "transporters";
+      const { data: p } = await sb.from(table).select("invoice_prefix").eq("id", data.party_id).maybeSingle();
+      if (!p) throw new Error("Party not found");
+      prefix = p.invoice_prefix;
+    }
+
+    const { data: seqRes, error } = await sb.rpc("next_invoice_seq", {
+      _module: data.module,
+      _dealer_id: data.module === "dealer" ? data.party_id : null,
+    });
+    if (error) throw new Error(error.message);
+    const seq = Number(seqRes);
+    return { prefix, seq, invoice_number: `${prefix}${String(seq).padStart(4, "0")}` };
+  });
+
+/* ------------------------------------------------------------------ */
+/* On-demand PDF: reuse existing, otherwise convert stored DOCX        */
+/* ------------------------------------------------------------------ */
+
+export const ensureInvoicePdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ invoice_id: z.string().uuid(), force: z.boolean().optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: inv, error } = await sb.from("invoices").select("*").eq("id", data.invoice_id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!inv) throw new Error("Invoice not found");
+
+    const signed = async (path: string) => {
+      const { data: s, error: sErr } = await sb.storage.from("invoices").createSignedUrl(path, 60 * 10);
+      if (sErr) throw new Error(sErr.message);
+      return s.signedUrl as string;
+    };
+
+    // Reuse an existing, up-to-date PDF
+    if (!data.force && inv.pdf_status === "ready" && inv.pdf_path) {
+      return { url: await signed(inv.pdf_path), reused: true };
+    }
+    if (!inv.docx_path) throw new Error("No DOCX on file — cannot generate PDF");
+
+    await sb.from("invoices").update({ pdf_status: "processing", pdf_error: null }).eq("id", inv.id);
+    try {
+      const { convertDocxToPdf } = await import("@/lib/pdf-conversion.server");
+      const { data: dl, error: dErr } = await sb.storage.from("invoices").download(inv.docx_path);
+      if (dErr) throw new Error(dErr.message);
+      const bytes = new Uint8Array(await dl.arrayBuffer());
+      const pdf = await convertDocxToPdf(bytes, `${inv.invoice_number}.docx`);
+      const pdf_path = `${inv.created_by}/${inv.module}/${inv.invoice_number}.pdf`;
+      const { error: upErr } = await sb.storage.from("invoices").upload(pdf_path, pdf, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+      if (upErr) throw new Error(upErr.message);
+      await sb.from("invoices").update({
+        pdf_path,
+        pdf_status: "ready",
+        pdf_generated_at: new Date().toISOString(),
+        pdf_error: null,
+      }).eq("id", inv.id);
+      return { url: await signed(pdf_path), reused: false };
+    } catch (e: any) {
+      await sb.from("invoices").update({
+        pdf_status: "failed",
+        pdf_error: e?.message ?? String(e),
+      }).eq("id", inv.id);
+      throw new Error(e?.message ?? "PDF conversion failed");
+    }
+  });
+
+/* ------------------------------------------------------------------ */
+/* Invalidate a stored PDF (call after an invoice is modified)         */
+/* ------------------------------------------------------------------ */
+
+export const invalidateInvoicePdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ invoice_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: inv } = await sb.from("invoices").select("pdf_path").eq("id", data.invoice_id).maybeSingle();
+    if (inv?.pdf_path) { try { await sb.storage.from("invoices").remove([inv.pdf_path]); } catch { /* ignore */ } }
+    const { error } = await sb.from("invoices").update({
+      pdf_path: null,
+      pdf_status: "pending",
+      pdf_generated_at: null,
+      pdf_error: null,
+    }).eq("id", data.invoice_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });

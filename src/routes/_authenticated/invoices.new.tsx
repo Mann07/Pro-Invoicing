@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { createInvoice } from "@/lib/invoice.functions";
+import { createInvoice, getNextInvoiceNumber } from "@/lib/invoice.functions";
 import { formatINR, todayISO, toIndianWordsINR } from "@/lib/format";
 import { MODULES, type ModuleId } from "@/lib/modules";
 
@@ -24,6 +24,8 @@ type Line = { description: string; hsn_sac: string; qty: number; rate: number; a
 function NewInvoice() {
   const navigate = useNavigate();
   const createFn = useServerFn(createInvoice);
+  const nextNumFn = useServerFn(getNextInvoiceNumber);
+
   const [module, setModule] = useState<ModuleId>("dealer");
 
   const partyTable = module === "dealer" ? "dealers" : module === "vendor" ? "vendors" : module === "transporter" ? "transporters" : null;
@@ -47,13 +49,26 @@ function NewInvoice() {
   const [gstRate, setGstRate] = useState<number>(18);
   const [gstEnabled, setGstEnabled] = useState(true);
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<Line[]>([{ description: "", hsn_sac: "", qty: 1, rate: 0, amount: 0 }]);
+  const [items, setItems] = useState<Line[]>([{ description: "", hsn_sac: "", qty: 0, rate: 0, amount: 0 }]);
   const [busy, setBusy] = useState(false);
+  const [numberEdited, setNumberEdited] = useState(false);
 
   const selectedParty = useMemo(() => (parties as any[]).find((p) => p.id === partyId), [parties, partyId]);
 
+  // Next invoice number preview (per module / selected party)
+  const { data: nextNum } = useQuery({
+    queryKey: ["next-invoice-number", module, partyId || "none"],
+    queryFn: () => nextNumFn({ data: { module, party_id: module === "customer" ? null : (partyId || null) } }),
+    enabled: module === "customer" || !!partyId,
+  });
+
+  // Prefill the invoice number field unless the user typed their own
+  useEffect(() => {
+    if (!numberEdited && nextNum?.invoice_number) setInvoiceNumber(nextNum.invoice_number);
+  }, [nextNum?.invoice_number, numberEdited]);
+
   // Reset party selection when module changes
-  useEffect(() => { setPartyId(""); setInvoiceNumber(""); setTemplateId(""); }, [module]);
+  useEffect(() => { setPartyId(""); setInvoiceNumber(""); setTemplateId(""); setNumberEdited(false); }, [module]);
 
   // Apply party defaults to first line
   useEffect(() => {
@@ -61,13 +76,14 @@ function NewInvoice() {
     setItems((prev) => prev.map((it, i) => i === 0 ? {
       description: it.description || selectedParty.default_description || "",
       hsn_sac: it.hsn_sac || selectedParty.default_hsn_sac || "",
-      qty: it.qty || 1,
+      qty: it.qty,
       rate: it.rate || Number(selectedParty.default_rate ?? 0),
       amount: 0,
     } : it));
     if (selectedParty.default_gst_rate != null) setGstRate(Number(selectedParty.default_gst_rate));
     if (selectedParty.default_template_id) setTemplateId(selectedParty.default_template_id);
   }, [selectedParty]);
+
 
   // Recompute amounts
   useEffect(() => {
@@ -94,7 +110,7 @@ function NewInvoice() {
     if (module !== "customer" && !partyId) return toast.error(`Select a ${module}`);
     if (module === "customer" && !customer.name) return toast.error("Customer name is required");
     setBusy(true);
-    const t = toast.loading("Generating Word document & converting to PDF…");
+    const t = toast.loading("Generating Word document…");
     try {
       const res = await createFn({
         data: {
@@ -147,17 +163,30 @@ function NewInvoice() {
               <SelectTrigger><SelectValue placeholder={`Select ${module}`} /></SelectTrigger>
               <SelectContent>
                 {(parties as any[]).map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{(d.nickname ?? d.name)} · {d.invoice_prefix}</SelectItem>
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {selectedParty && (
+              <div className="rounded-md bg-muted p-3 text-sm">
+                <div><span className="text-muted-foreground">Dealer: </span><span className="font-medium">{selectedParty.name}</span></div>
+                <div><span className="text-muted-foreground">Invoice prefix: </span><span className="font-medium">{selectedParty.invoice_prefix}</span></div>
+                <div><span className="text-muted-foreground">Invoice number: </span><span className="font-medium">{nextNum?.invoice_number ?? "…"}</span></div>
+              </div>
+            )}
           </div>
         )}
         <div className="space-y-2"><Label>Issue date</Label><Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} required /></div>
         <div className="space-y-2 md:col-span-2">
-          <Label>Invoice number (auto if blank)</Label>
-          <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Leave blank to auto-generate" />
+          <Label>Invoice number</Label>
+          <Input
+            value={invoiceNumber}
+            onChange={(e) => { setNumberEdited(true); setInvoiceNumber(e.target.value); }}
+            placeholder="Invoice number"
+          />
+          <p className="text-xs text-muted-foreground">Auto-filled with the next number; editable if you need a custom one.</p>
         </div>
+
         <div className="space-y-2">
           <Label>Template</Label>
           <Select value={templateId} onValueChange={setTemplateId}>
@@ -173,7 +202,7 @@ function NewInvoice() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">Line items</h2>
           <Button type="button" size="sm" variant="outline"
-            onClick={() => setItems([...items, { description: "", hsn_sac: "", qty: 1, rate: 0, amount: 0 }])}>
+            onClick={() => setItems([...items, { description: "", hsn_sac: "", qty: 0, rate: 0, amount: 0 }])}>
             <Plus className="mr-1 h-4 w-4" /> Add
           </Button>
         </div>

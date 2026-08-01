@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { addPayment, cancelInvoice, getInvoiceDownloadUrl, regeneratePdf } from "@/lib/invoice.functions";
+import { addPayment, cancelInvoice, getInvoiceDownloadUrl, ensureInvoicePdf } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
@@ -32,7 +32,7 @@ function InvoiceDetail() {
   const dlFn = useServerFn(getInvoiceDownloadUrl);
   const payFn = useServerFn(addPayment);
   const cancelFn = useServerFn(cancelInvoice);
-  const regenFn = useServerFn(regeneratePdf);
+  const pdfFn = useServerFn(ensureInvoicePdf);
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -78,25 +78,22 @@ function InvoiceDetail() {
       window.open(url, "_blank");
     } catch (e: any) { toast.error(e.message); }
   }
-  async function downloadPdf() {
-    if (!inv.pdf_path) return toast.error("No PDF yet — click 'Generate PDF'.");
-    try {
-      const { url } = await dlFn({ data: { path: inv.pdf_path } });
-      window.open(url, "_blank");
-    } catch (e: any) { toast.error(e.message); }
-  }
-  async function regenerate() {
+  async function downloadPdf(force = false) {
     if (regenBusy) return;
+    if (!inv.docx_path) return toast.error("No DOCX on file — cannot generate PDF.");
+    const needsBuild = force || inv.pdf_status !== "ready" || !inv.pdf_path;
     setRegenBusy(true);
-    const t = toast.loading("Converting DOCX to PDF…");
+    const t = needsBuild ? toast.loading("Converting DOCX to PDF…") : undefined;
     try {
-      await regenFn({ data: { invoice_id: id } });
-      toast.success("PDF generated", { id: t });
+      const { url } = await pdfFn({ data: { invoice_id: id, force } });
+      if (t) toast.success("PDF ready", { id: t });
+      window.open(url, "_blank");
       qc.invalidateQueries({ queryKey: ["invoice", id] });
     } catch (e: any) {
       toast.error(e.message ?? "PDF conversion failed", { id: t });
     } finally { setRegenBusy(false); }
   }
+
 
   async function recordPayment() {
     const amt = Number(amount);
@@ -146,19 +143,18 @@ function InvoiceDetail() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={downloadDocx} disabled={!inv.docx_path}><FileText className="mr-2 h-4 w-4" /> DOCX</Button>
-          {inv.pdf_status === "ready" && inv.pdf_path ? (
-            <Button onClick={downloadPdf}><FileDown className="mr-2 h-4 w-4" /> PDF</Button>
-          ) : (
-            <Button onClick={regenerate} disabled={regenBusy || !inv.docx_path}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${regenBusy ? "animate-spin" : ""}`} />
-              {inv.pdf_status === "failed" ? "Retry PDF" : "Generate PDF"}
-            </Button>
-          )}
+          <Button onClick={() => downloadPdf(false)} disabled={regenBusy || !inv.docx_path}>
+            {regenBusy
+              ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              : <FileDown className="mr-2 h-4 w-4" />}
+            Download PDF
+          </Button>
           {inv.pdf_status === "ready" && !locked && (
-            <Button variant="outline" onClick={regenerate} disabled={regenBusy}>
+            <Button variant="outline" onClick={() => downloadPdf(true)} disabled={regenBusy}>
               <RefreshCw className={`mr-2 h-4 w-4 ${regenBusy ? "animate-spin" : ""}`} /> Regenerate
             </Button>
           )}
+
         </div>
       </div>
 
