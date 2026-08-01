@@ -202,7 +202,7 @@ function NewInvoice() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">Line items</h2>
           <Button type="button" size="sm" variant="outline"
-            onClick={() => setItems([...items, { description: "", hsn_sac: "", qty: 1, rate: 0, amount: 0 }])}>
+            onClick={() => setItems([...items, { description: "", hsn_sac: "", qty: 0, rate: 0, amount: 0 }])}>
             <Plus className="mr-1 h-4 w-4" /> Add
           </Button>
         </div>
