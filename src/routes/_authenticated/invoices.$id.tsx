@@ -78,25 +78,22 @@ function InvoiceDetail() {
       window.open(url, "_blank");
     } catch (e: any) { toast.error(e.message); }
   }
-  async function downloadPdf() {
-    if (!inv.pdf_path) return toast.error("No PDF yet — click 'Generate PDF'.");
-    try {
-      const { url } = await dlFn({ data: { path: inv.pdf_path } });
-      window.open(url, "_blank");
-    } catch (e: any) { toast.error(e.message); }
-  }
-  async function regenerate() {
+  async function downloadPdf(force = false) {
     if (regenBusy) return;
+    if (!inv.docx_path) return toast.error("No DOCX on file — cannot generate PDF.");
+    const needsBuild = force || inv.pdf_status !== "ready" || !inv.pdf_path;
     setRegenBusy(true);
-    const t = toast.loading("Converting DOCX to PDF…");
+    const t = needsBuild ? toast.loading("Converting DOCX to PDF…") : undefined;
     try {
-      await regenFn({ data: { invoice_id: id } });
-      toast.success("PDF generated", { id: t });
+      const { url } = await pdfFn({ data: { invoice_id: id, force } });
+      if (t) toast.success("PDF ready", { id: t });
+      window.open(url, "_blank");
       qc.invalidateQueries({ queryKey: ["invoice", id] });
     } catch (e: any) {
       toast.error(e.message ?? "PDF conversion failed", { id: t });
     } finally { setRegenBusy(false); }
   }
+
 
   async function recordPayment() {
     const amt = Number(amount);
