@@ -24,6 +24,8 @@ type Line = { description: string; hsn_sac: string; qty: number; rate: number; a
 function NewInvoice() {
   const navigate = useNavigate();
   const createFn = useServerFn(createInvoice);
+  const nextNumFn = useServerFn(getNextInvoiceNumber);
+
   const [module, setModule] = useState<ModuleId>("dealer");
 
   const partyTable = module === "dealer" ? "dealers" : module === "vendor" ? "vendors" : module === "transporter" ? "transporters" : null;
