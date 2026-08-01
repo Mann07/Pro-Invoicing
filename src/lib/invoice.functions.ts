@@ -109,9 +109,26 @@ export const createInvoice = createServerFn({ method: "POST" })
       _dealer_id: dealerScope,
     });
     if (seqErr) throw new Error(seqErr.message);
-    const seq = Number(seqRes);
-    const invoice_number =
-      (data.invoice_number && data.invoice_number.trim()) || `${modulePrefix}${String(seq).padStart(4, "0")}`;
+    let seq = Number(seqRes);
+    const manual = data.invoice_number?.trim() || "";
+    const invoice_number = manual || `${modulePrefix}${String(seq).padStart(4, "0")}`;
+
+    if (manual) {
+      // Uniqueness (global — invoice numbers are user-visible identifiers)
+      const { data: dupe } = await sb
+        .from("invoices")
+        .select("id")
+        .eq("invoice_number", manual)
+        .maybeSingle();
+      if (dupe) throw new Error(`Invoice number ${manual} already exists`);
+      // Keep future numbering ahead of any manually entered higher number
+      const digits = manual.match(/(\d+)\s*$/);
+      if (digits) {
+        const n = Number(digits[1]);
+        if (Number.isFinite(n) && n >= seq) seq = n;
+      }
+    }
+
 
     // Template — user-picked, or fall back to party default, or any active for module
     let templateId: string | null = data.template_id ?? party?.default_template_id ?? null;
