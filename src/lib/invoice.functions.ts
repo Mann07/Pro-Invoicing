@@ -221,31 +221,12 @@ export const createInvoice = createServerFn({ method: "POST" })
 
     }
 
-    // Convert to PDF via iLovePDF (deferred until after we have DOCX bytes).
-    let pdf_status: "pending" | "ready" | "failed" = "pending";
-    let pdf_error: string | null = null;
-    let pdf_generated_at: string | null = null;
-    if (docx_path) {
-      try {
-        const { convertDocxToPdf } = await import("@/lib/pdf-conversion.server");
-        const { data: dl, error: dErr } = await sb.storage.from("invoices").download(docx_path);
-        if (dErr) throw new Error(dErr.message);
-        const bytes = new Uint8Array(await dl.arrayBuffer());
-        const pdf = await convertDocxToPdf(bytes, `${invoice_number}.docx`);
-        pdf_path = `${userId}/${data.module}/${invoice_number}.pdf`;
-        const { error: pdfErr } = await sb.storage
-          .from("invoices")
-          .upload(pdf_path, pdf, { contentType: "application/pdf", upsert: true });
-        if (pdfErr) throw new Error(pdfErr.message);
-        pdf_status = "ready";
-        pdf_generated_at = new Date().toISOString();
-      } catch (e: any) {
-        // Do NOT fail the invoice — keep DOCX; user can retry from the detail page.
-        pdf_status = "failed";
-        pdf_error = e?.message ?? String(e);
-        pdf_path = null;
-      }
-    }
+    // PDF is generated on demand (first "Download PDF" click), not at creation time.
+    const pdf_status: "pending" | "ready" | "failed" = "pending";
+    const pdf_error: string | null = null;
+    const pdf_generated_at: string | null = null;
+    pdf_path = null;
+
 
     const insertRow: any = {
       module: data.module,
