@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { addPayment, cancelInvoice, getInvoiceDownloadUrl, ensureInvoicePdf } from "@/lib/invoice.functions";
+import { addPayment, cancelInvoice, getInvoiceDownloadUrl, ensureInvoicePdf, deleteInvoicePermanently } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
@@ -33,6 +33,7 @@ function InvoiceDetail() {
   const payFn = useServerFn(addPayment);
   const cancelFn = useServerFn(cancelInvoice);
   const pdfFn = useServerFn(ensureInvoicePdf);
+  const deleteFn = useServerFn(deleteInvoicePermanently);
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -119,11 +120,16 @@ function InvoiceDetail() {
   }
 
   async function deleteInvoice() {
-    if (!confirm("Delete this invoice? Its number becomes a gap (a warning will appear).")) return;
-    const { error } = await (supabase as any).from("invoices").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Deleted");
-    navigate({ to: "/dashboard" });
+    if (!confirm("Permanently delete this invoice? Its number becomes available again.")) return;
+    try {
+      await deleteFn({ data: { invoice_id: id } });
+      qc.removeQueries({ queryKey: ["invoice", id] });
+      await qc.invalidateQueries();
+      toast.success("Invoice permanently deleted");
+      navigate({ to: "/dashboard" });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Delete failed");
+    }
   }
 
   return (
