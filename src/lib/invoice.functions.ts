@@ -33,6 +33,7 @@ const CreateInvoiceInput = z.object({
   issue_date: z.string(),
   line_items: z.array(LineItemSchema),
   gst_rate: z.number().min(0).max(100),
+  tds_rate: z.number().min(0).max(100).optional(),
   notes: z.string().optional().nullable(),
   template_id: z.string().uuid().nullable().optional(),
 });
@@ -74,6 +75,10 @@ export const createInvoice = createServerFn({ method: "POST" })
     const subtotal = +data.line_items.reduce((s, it) => s + Number(it.amount || 0), 0).toFixed(2);
     const gst_amount = +(subtotal * (data.gst_rate / 100)).toFixed(2);
     const total = +(subtotal + gst_amount).toFixed(2);
+    // TDS is deducted by the payer on the subtotal (before GST); it does not change the invoice value.
+    const tds_rate = Number(data.tds_rate ?? 0);
+    const tds_amount = +(subtotal * (tds_rate / 100)).toFixed(2);
+    const expected_payment = +(total - tds_amount).toFixed(2);
 
     // Load party master (if applicable) and module prefix + template
     let party: any = null;
@@ -202,6 +207,9 @@ export const createInvoice = createServerFn({ method: "POST" })
         gst_rate: data.gst_rate.toFixed(2),
         gst_amount: gst_amount.toFixed(2),
         total: total.toFixed(2),
+        tds_rate: tds_rate.toFixed(2),
+        tds_amount: tds_amount.toFixed(2),
+        expected_payment: expected_payment.toFixed(2),
         amount_in_words: toIndianWordsINR(total),
         notes: safe(data.notes),
       };
@@ -245,6 +253,8 @@ export const createInvoice = createServerFn({ method: "POST" })
       subtotal,
       gst_rate: data.gst_rate,
       gst_amount,
+      tds_rate,
+      tds_amount,
       total,
       notes: data.notes ?? null,
       status: "pending",
@@ -315,8 +325,11 @@ export const addPayment = createServerFn({ method: "POST" })
 
     const newPaid = Number(inv.amount_paid) + Number(data.amount);
     const total = Number(inv.total);
+    // Dealers deduct TDS on the subtotal; the expected receipt is total − TDS.
+    const tdsAmount = Number(inv.tds_amount ?? 0);
+    const expected = +(total - tdsAmount).toFixed(2);
     let nextStatus: "pending" | "partial" | "paid" = "pending";
-    if (newPaid >= total) nextStatus = "paid";
+    if (newPaid + 0.01 >= expected) nextStatus = "paid";
     else if (newPaid > 0) nextStatus = "partial";
 
     const patch: any = { amount_paid: newPaid, status: nextStatus };

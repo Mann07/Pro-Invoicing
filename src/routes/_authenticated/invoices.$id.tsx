@@ -70,7 +70,9 @@ function InvoiceDetail() {
   if (!inv) return <div className="p-6">Not found. <Link to="/dashboard" className="text-primary underline">Back</Link></div>;
 
   const locked = inv.status === "paid" || inv.status === "cancelled";
-  const outstanding = Math.max(0, Number(inv.total) - Number(inv.amount_paid));
+  const tdsAmount = Number(inv.tds_amount ?? 0);
+  const expectedPayment = +(Number(inv.total) - tdsAmount).toFixed(2);
+  const outstanding = Math.max(0, expectedPayment - Number(inv.amount_paid));
 
   async function downloadDocx() {
     if (!inv.docx_path) return toast.error("No DOCX generated (no active template).");
@@ -227,7 +229,13 @@ function InvoiceDetail() {
             <Row label="Subtotal" value={formatINR(inv.subtotal)} />
             <Row label={`GST @ ${inv.gst_rate}%`} value={formatINR(inv.gst_amount)} />
             <div className="my-1 border-t" />
-            <Row label="Total" value={formatINR(inv.total)} bold />
+            <Row label="Invoice total" value={formatINR(inv.total)} bold />
+            {tdsAmount > 0 && (
+              <>
+                <Row label={`TDS @ ${inv.tds_rate}% (on subtotal)`} value={`− ${formatINR(tdsAmount)}`} />
+                <Row label="Expected payment" value={formatINR(expectedPayment)} bold />
+              </>
+            )}
             <Row label="Paid" value={formatINR(inv.amount_paid)} />
             <Row label="Outstanding" value={formatINR(outstanding)} />
           </div>

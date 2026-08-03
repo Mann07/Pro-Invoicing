@@ -28,6 +28,7 @@ export type Database = {
           gstin: string | null
           id: string
           invoice_prefix: string
+          is_active: boolean
           mobile: string | null
           name: string
           nickname: string | null
@@ -47,6 +48,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           invoice_prefix: string
+          is_active?: boolean
           mobile?: string | null
           name: string
           nickname?: string | null
@@ -66,6 +68,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           invoice_prefix?: string
+          is_active?: boolean
           mobile?: string | null
           name?: string
           nickname?: string | null
@@ -179,6 +182,8 @@ export type Database = {
           pdf_status: Database["public"]["Enums"]["pdf_status"]
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
+          tds_amount: number
+          tds_rate: number
           template_id: string | null
           template_version: number | null
           total: number
@@ -214,6 +219,8 @@ export type Database = {
           pdf_status?: Database["public"]["Enums"]["pdf_status"]
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
+          tds_amount?: number
+          tds_rate?: number
           template_id?: string | null
           template_version?: number | null
           total?: number
@@ -249,6 +256,8 @@ export type Database = {
           pdf_status?: Database["public"]["Enums"]["pdf_status"]
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
+          tds_amount?: number
+          tds_rate?: number
           template_id?: string | null
           template_version?: number | null
           total?: number
@@ -337,6 +346,7 @@ export type Database = {
           gstin: string | null
           id: string
           invoice_prefix: string
+          is_active: boolean
           mobile: string | null
           name: string
           nickname: string | null
@@ -356,6 +366,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           invoice_prefix: string
+          is_active?: boolean
           mobile?: string | null
           name: string
           nickname?: string | null
@@ -375,6 +386,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           invoice_prefix?: string
+          is_active?: boolean
           mobile?: string | null
           name?: string
           nickname?: string | null
@@ -423,6 +435,7 @@ export type Database = {
           gstin: string | null
           id: string
           invoice_prefix: string
+          is_active: boolean
           mobile: string | null
           name: string
           nickname: string | null
@@ -442,6 +455,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           invoice_prefix: string
+          is_active?: boolean
           mobile?: string | null
           name: string
           nickname?: string | null
@@ -461,6 +475,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           invoice_prefix?: string
+          is_active?: boolean
           mobile?: string | null
           name?: string
           nickname?: string | null

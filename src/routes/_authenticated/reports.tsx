@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
@@ -207,7 +207,11 @@ function ModuleReport({ module }: { module: ModuleId }) {
             <tbody className="divide-y">
               {rows.map(({ inv, party }) => (
                 <tr key={inv.id} className="hover:bg-muted/40">
-                  <td className="px-4 py-2 font-medium">{inv.invoice_number}</td>
+                  <td className="px-4 py-2 font-medium">
+                    <Link to="/invoices/$id" params={{ id: inv.id }} className="text-primary hover:underline">
+                      {inv.invoice_number}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2">{formatDate(inv.issue_date)}</td>
                   <td className="px-4 py-2">{party?.nickname || party?.name || inv.customer_name || "—"}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.total)}</td>

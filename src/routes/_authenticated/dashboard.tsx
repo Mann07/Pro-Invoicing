@@ -4,7 +4,7 @@ import { FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { formatINR } from "@/lib/format";
+import { formatINR, formatDate } from "@/lib/format";
 import { MODULES, type ModuleId } from "@/lib/modules";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -15,15 +15,24 @@ function useModuleTotals(module: ModuleId) {
   return useQuery({
     queryKey: ["dashboard", module],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("invoices").select("total,amount_paid,status,invoice_number,issue_date,id").eq("module", module).order("created_at", { ascending: false }).limit(10);
+      // Stats are computed from ALL invoices of the module, not just recent ones.
+      const { data } = await (supabase as any)
+        .from("invoices")
+        .select("id,total,amount_paid,tds_amount,status,invoice_number,issue_date")
+        .eq("module", module)
+        .order("issue_date", { ascending: false });
       const rows = (data ?? []) as any[];
       const active = rows.filter((r) => r.status !== "cancelled");
+      const expected = (r: any) => Number(r.total) - Number(r.tds_amount ?? 0);
       return {
         count: active.length,
         revenue: active.reduce((s, r) => s + Number(r.total), 0),
         collected: active.reduce((s, r) => s + Number(r.amount_paid), 0),
-        outstanding: active.reduce((s, r) => s + Number(r.total) - Number(r.amount_paid), 0),
-        recent: rows,
+        outstanding: active.reduce((s, r) => s + Math.max(0, expected(r) - Number(r.amount_paid)), 0),
+        pending: active.filter((r) => r.status === "pending" || r.status === "draft").length,
+        partial: active.filter((r) => r.status === "partial").length,
+        paid: active.filter((r) => r.status === "paid").length,
+        recent: rows.slice(0, 10),
       };
     },
   });
@@ -60,11 +69,22 @@ function ModuleSummary({ module }: { module: ModuleId }) {
   return (
     <>
       <div className="grid gap-3 md:grid-cols-4">
-        <Stat label="Invoices (recent)" value={String(data.count)} />
-        <Stat label="Revenue" value={formatINR(data.revenue)} />
-        <Stat label="Collected" value={formatINR(data.collected)} />
-        <Stat label="Outstanding" value={formatINR(data.outstanding)} accent />
+        <Stat label="Total invoices" value={String(data.count)} />
+        <Stat label="Total invoice value" value={formatINR(data.revenue)} />
+        <Stat label="Total paid" value={formatINR(data.collected)} />
+        <Stat label="Total outstanding" value={formatINR(data.outstanding)} accent />
       </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <Stat label="Pending invoices" value={String(data.pending)} />
+        <Stat label="Partially paid" value={String(data.partial)} />
+        <Stat label="Paid invoices" value={String(data.paid)} />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase text-muted-foreground">Recent invoices</h2>
+        <Link to="/invoices"><Button size="sm" variant="outline">View all</Button></Link>
+      </div>
+
       <div className="overflow-hidden rounded-lg border bg-card">
         {data.recent.length === 0 ? (
           <div className="flex flex-col items-center gap-3 p-10 text-center">
@@ -89,7 +109,7 @@ function ModuleSummary({ module }: { module: ModuleId }) {
                       {inv.invoice_number}
                     </Link>
                   </td>
-                  <td className="px-4 py-2">{inv.issue_date}</td>
+                  <td className="px-4 py-2">{formatDate(inv.issue_date)}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.total)}</td>
                   <td className="px-4 py-2 capitalize">{inv.status}</td>
                 </tr>
