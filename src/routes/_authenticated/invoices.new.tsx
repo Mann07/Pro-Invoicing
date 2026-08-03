@@ -95,6 +95,8 @@ function NewInvoice() {
   const subtotal = items.reduce((s, it) => s + (it.amount || 0), 0);
   const gstAmt = gstEnabled ? +(subtotal * (gstRate / 100)).toFixed(2) : 0;
   const total = subtotal + gstAmt;
+  const tdsAmt = tdsEnabled ? +(subtotal * (tdsRate / 100)).toFixed(2) : 0;
+  const expectedPayment = +(total - tdsAmt).toFixed(2);
   const amountWords = toIndianWordsINR(total);
 
   function updateItem(i: number, patch: Partial<Line>) {
