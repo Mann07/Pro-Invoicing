@@ -33,6 +33,7 @@ const CreateInvoiceInput = z.object({
   issue_date: z.string(),
   line_items: z.array(LineItemSchema),
   gst_rate: z.number().min(0).max(100),
+  tds_rate: z.number().min(0).max(100).optional(),
   notes: z.string().optional().nullable(),
   template_id: z.string().uuid().nullable().optional(),
 });
@@ -74,6 +75,10 @@ export const createInvoice = createServerFn({ method: "POST" })
     const subtotal = +data.line_items.reduce((s, it) => s + Number(it.amount || 0), 0).toFixed(2);
     const gst_amount = +(subtotal * (data.gst_rate / 100)).toFixed(2);
     const total = +(subtotal + gst_amount).toFixed(2);
+    // TDS is deducted by the payer on the subtotal (before GST); it does not change the invoice value.
+    const tds_rate = Number(data.tds_rate ?? 0);
+    const tds_amount = +(subtotal * (tds_rate / 100)).toFixed(2);
+    const expected_payment = +(total - tds_amount).toFixed(2);
 
     // Load party master (if applicable) and module prefix + template
     let party: any = null;
