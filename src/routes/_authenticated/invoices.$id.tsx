@@ -70,7 +70,9 @@ function InvoiceDetail() {
   if (!inv) return <div className="p-6">Not found. <Link to="/dashboard" className="text-primary underline">Back</Link></div>;
 
   const locked = inv.status === "paid" || inv.status === "cancelled";
-  const outstanding = Math.max(0, Number(inv.total) - Number(inv.amount_paid));
+  const tdsAmount = Number(inv.tds_amount ?? 0);
+  const expectedPayment = +(Number(inv.total) - tdsAmount).toFixed(2);
+  const outstanding = Math.max(0, expectedPayment - Number(inv.amount_paid));
 
   async function downloadDocx() {
     if (!inv.docx_path) return toast.error("No DOCX generated (no active template).");
