@@ -325,8 +325,11 @@ export const addPayment = createServerFn({ method: "POST" })
 
     const newPaid = Number(inv.amount_paid) + Number(data.amount);
     const total = Number(inv.total);
+    // Dealers deduct TDS on the subtotal; the expected receipt is total − TDS.
+    const tdsAmount = Number(inv.tds_amount ?? 0);
+    const expected = +(total - tdsAmount).toFixed(2);
     let nextStatus: "pending" | "partial" | "paid" = "pending";
-    if (newPaid >= total) nextStatus = "paid";
+    if (newPaid + 0.01 >= expected) nextStatus = "paid";
     else if (newPaid > 0) nextStatus = "partial";
 
     const patch: any = { amount_paid: newPaid, status: nextStatus };
