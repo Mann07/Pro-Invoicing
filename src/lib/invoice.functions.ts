@@ -207,6 +207,9 @@ export const createInvoice = createServerFn({ method: "POST" })
         gst_rate: data.gst_rate.toFixed(2),
         gst_amount: gst_amount.toFixed(2),
         total: total.toFixed(2),
+        tds_rate: tds_rate.toFixed(2),
+        tds_amount: tds_amount.toFixed(2),
+        expected_payment: expected_payment.toFixed(2),
         amount_in_words: toIndianWordsINR(total),
         notes: safe(data.notes),
       };
@@ -250,6 +253,8 @@ export const createInvoice = createServerFn({ method: "POST" })
       subtotal,
       gst_rate: data.gst_rate,
       gst_amount,
+      tds_rate,
+      tds_amount,
       total,
       notes: data.notes ?? null,
       status: "pending",
