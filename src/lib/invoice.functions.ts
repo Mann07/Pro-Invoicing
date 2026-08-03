@@ -525,3 +525,30 @@ export const invalidateInvoicePdf = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/* ------------------------------------------------------------------ */
+/* Permanent delete (row + payments + stored documents)                */
+/* ------------------------------------------------------------------ */
+
+export const deleteInvoicePermanently = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ invoice_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: inv } = await sb
+      .from("invoices")
+      .select("id, docx_path, pdf_path")
+      .eq("id", data.invoice_id)
+      .maybeSingle();
+    if (!inv) return { ok: true };
+
+    const paths = [inv.docx_path, inv.pdf_path].filter(Boolean) as string[];
+    if (paths.length) { try { await sb.storage.from("invoices").remove(paths); } catch { /* ignore */ } }
+
+    const { error: pErr } = await sb.from("invoice_payments").delete().eq("invoice_id", inv.id);
+    if (pErr) throw new Error(pErr.message);
+
+    const { error } = await sb.from("invoices").delete().eq("id", inv.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

@@ -163,7 +163,7 @@ function NewInvoice() {
               <SelectTrigger><SelectValue placeholder={`Select ${module}`} /></SelectTrigger>
               <SelectContent>
                 {(parties as any[]).map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  <SelectItem key={d.id} value={d.id}>{d.nickname || d.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
