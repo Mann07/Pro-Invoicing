@@ -229,7 +229,13 @@ function InvoiceDetail() {
             <Row label="Subtotal" value={formatINR(inv.subtotal)} />
             <Row label={`GST @ ${inv.gst_rate}%`} value={formatINR(inv.gst_amount)} />
             <div className="my-1 border-t" />
-            <Row label="Total" value={formatINR(inv.total)} bold />
+            <Row label="Invoice total" value={formatINR(inv.total)} bold />
+            {tdsAmount > 0 && (
+              <>
+                <Row label={`TDS @ ${inv.tds_rate}% (on subtotal)`} value={`− ${formatINR(tdsAmount)}`} />
+                <Row label="Expected payment" value={formatINR(expectedPayment)} bold />
+              </>
+            )}
             <Row label="Paid" value={formatINR(inv.amount_paid)} />
             <Row label="Outstanding" value={formatINR(outstanding)} />
           </div>
