@@ -48,6 +48,8 @@ function NewInvoice() {
   const [templateId, setTemplateId] = useState<string>("");
   const [gstRate, setGstRate] = useState<number>(18);
   const [gstEnabled, setGstEnabled] = useState(true);
+  const [tdsEnabled, setTdsEnabled] = useState(true);
+  const [tdsRate, setTdsRate] = useState<number>(2);
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<Line[]>([{ description: "", hsn_sac: "", qty: 0, rate: 0, amount: 0 }]);
   const [busy, setBusy] = useState(false);
