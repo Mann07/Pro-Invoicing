@@ -125,6 +125,7 @@ function NewInvoice() {
           issue_date: issueDate,
           line_items: items,
           gst_rate: gstEnabled ? gstRate : 0,
+          tds_rate: tdsEnabled ? tdsRate : 0,
           notes,
           template_id: templateId || null,
         },
