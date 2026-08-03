@@ -243,17 +243,35 @@ function NewInvoice() {
           {gstEnabled && (
             <div className="space-y-2"><Label>GST rate (%)</Label><Input type="number" step="0.01" value={gstRate} onChange={(e) => setGstRate(Number(e.target.value))} /></div>
           )}
+          <div className="flex items-center gap-3">
+            <input type="checkbox" id="tds" checked={tdsEnabled} onChange={(e) => setTdsEnabled(e.target.checked)} className="h-4 w-4" />
+            <Label htmlFor="tds">Party deducts TDS</Label>
+          </div>
+          {tdsEnabled && (
+            <div className="space-y-2">
+              <Label>TDS rate (%)</Label>
+              <Input type="number" step="0.01" value={tdsRate} onChange={(e) => setTdsRate(Number(e.target.value))} />
+              <p className="text-xs text-muted-foreground">Calculated on the subtotal (before GST). Affects payment reconciliation only.</p>
+            </div>
+          )}
           <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></div>
         </div>
         <div className="space-y-2 rounded-md bg-muted p-4">
           <Row label="Subtotal" value={formatINR(subtotal)} />
           {gstEnabled && <Row label={`GST @ ${gstRate}%`} value={formatINR(gstAmt)} />}
           <div className="my-2 border-t" />
-          <Row label="Total" value={formatINR(total)} bold />
+          <Row label="Invoice total" value={formatINR(total)} bold />
+          {tdsEnabled && tdsAmt > 0 && (
+            <>
+              <Row label={`TDS @ ${tdsRate}% (on subtotal)`} value={`− ${formatINR(tdsAmt)}`} />
+              <Row label="Expected payment" value={formatINR(expectedPayment)} bold />
+            </>
+          )}
           <div className="pt-2 text-xs italic text-muted-foreground">
             <span className="font-medium not-italic text-foreground">In words: </span>{amountWords}
           </div>
         </div>
+
       </div>
 
       <div className="flex justify-end gap-2">
