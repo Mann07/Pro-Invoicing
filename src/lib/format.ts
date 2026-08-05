@@ -7,14 +7,18 @@ export const formatINR = (n: number | string | null | undefined) => {
   }).format(Number.isFinite(v) ? v : 0);
 };
 
+// Always renders DD-MM-YYYY. Date-only strings (YYYY-MM-DD) are read as-is,
+// without timezone shifting.
 export const formatDate = (d: string | Date | null | undefined) => {
   if (!d) return "—";
+  if (typeof d === "string") {
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  }
   const date = typeof d === "string" ? new Date(d) : d;
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return "—";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}`;
 };
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
