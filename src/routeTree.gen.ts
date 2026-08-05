@@ -23,6 +23,7 @@ import { Route as AuthenticatedDealersRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
+import { Route as AuthenticatedDealersIndexRouteImport } from './routes/_authenticated/dealers.index'
 import { Route as AuthenticatedVendorsIdRouteImport } from './routes/_authenticated/vendors.$id'
 import { Route as AuthenticatedTransportersIdRouteImport } from './routes/_authenticated/transporters.$id'
 import { Route as AuthenticatedInvoicesNewRouteImport } from './routes/_authenticated/invoices.new'
@@ -100,6 +101,12 @@ const AuthenticatedInvoicesIndexRoute =
     path: '/invoices/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDealersIndexRoute =
+  AuthenticatedDealersIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedDealersRoute,
+  } as any)
 const AuthenticatedVendorsIdRoute = AuthenticatedVendorsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -146,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/transporters/$id': typeof AuthenticatedTransportersIdRoute
   '/vendors/$id': typeof AuthenticatedVendorsIdRoute
+  '/dealers/': typeof AuthenticatedDealersIndexRoute
   '/invoices/': typeof AuthenticatedInvoicesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -155,7 +163,6 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/dealers': typeof AuthenticatedDealersRouteWithChildren
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -166,6 +173,7 @@ export interface FileRoutesByTo {
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/transporters/$id': typeof AuthenticatedTransportersIdRoute
   '/vendors/$id': typeof AuthenticatedVendorsIdRoute
+  '/dealers': typeof AuthenticatedDealersIndexRoute
   '/invoices': typeof AuthenticatedInvoicesIndexRoute
 }
 export interface FileRoutesById {
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/_authenticated/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/_authenticated/transporters/$id': typeof AuthenticatedTransportersIdRoute
   '/_authenticated/vendors/$id': typeof AuthenticatedVendorsIdRoute
+  '/_authenticated/dealers/': typeof AuthenticatedDealersIndexRoute
   '/_authenticated/invoices/': typeof AuthenticatedInvoicesIndexRoute
 }
 export interface FileRouteTypes {
@@ -210,6 +219,7 @@ export interface FileRouteTypes {
     | '/invoices/new'
     | '/transporters/$id'
     | '/vendors/$id'
+    | '/dealers/'
     | '/invoices/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -219,7 +229,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/customers'
     | '/dashboard'
-    | '/dealers'
     | '/reports'
     | '/settings'
     | '/templates'
@@ -230,6 +239,7 @@ export interface FileRouteTypes {
     | '/invoices/new'
     | '/transporters/$id'
     | '/vendors/$id'
+    | '/dealers'
     | '/invoices'
   id:
     | '__root__'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/_authenticated/invoices/new'
     | '/_authenticated/transporters/$id'
     | '/_authenticated/vendors/$id'
+    | '/_authenticated/dealers/'
     | '/_authenticated/invoices/'
   fileRoutesById: FileRoutesById
 }
@@ -362,6 +373,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvoicesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dealers/': {
+      id: '/_authenticated/dealers/'
+      path: '/'
+      fullPath: '/dealers/'
+      preLoaderRoute: typeof AuthenticatedDealersIndexRouteImport
+      parentRoute: typeof AuthenticatedDealersRoute
+    }
     '/_authenticated/vendors/$id': {
       id: '/_authenticated/vendors/$id'
       path: '/$id'
@@ -402,10 +420,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedDealersRouteChildren {
   AuthenticatedDealersIdRoute: typeof AuthenticatedDealersIdRoute
+  AuthenticatedDealersIndexRoute: typeof AuthenticatedDealersIndexRoute
 }
 
 const AuthenticatedDealersRouteChildren: AuthenticatedDealersRouteChildren = {
   AuthenticatedDealersIdRoute: AuthenticatedDealersIdRoute,
+  AuthenticatedDealersIndexRoute: AuthenticatedDealersIndexRoute,
 }
 
 const AuthenticatedDealersRouteWithChildren =

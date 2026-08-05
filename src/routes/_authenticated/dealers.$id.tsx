@@ -76,10 +76,12 @@ function DealerDetail() {
     const tds = active.reduce((s, i) => s + Number(i.tds_amount ?? 0), 0);
     const value = active.reduce((s, i) => s + Number(i.total), 0);
     const paid = active.reduce((s, i) => s + Number(i.amount_paid), 0);
+    const gst = active.reduce((s, i) => s + Number(i.gst_amount ?? 0), 0);
     return {
       count: active.length,
       value,
       paid,
+      gst,
       outstanding: active.reduce((s, i) => s + outstandingOf(i), 0),
       paidCount: active.filter((i) => i.status === "paid").length,
       pendingCount: active.filter((i) => i.status === "pending" || i.status === "draft").length,
@@ -89,6 +91,7 @@ function DealerDetail() {
       expected: value - tds,
     };
   }, [invoices]);
+
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -188,7 +191,9 @@ function DealerDetail() {
           <Stat label="Partially paid" value={String(stats.partialCount)} />
           <Stat label="Last invoice date" value={stats.lastInvoiceDate ? formatDate(stats.lastInvoiceDate) : "—"} />
           <Stat label="Last payment date" value={lastPaymentDate ? formatDate(lastPaymentDate) : "—"} />
+          <Stat label="Total GST" value={formatINR(stats.gst)} />
           {stats.tds > 0 && (
+
             <>
               <Stat label="Total TDS deducted" value={formatINR(stats.tds)} />
               <Stat label="Expected payment" value={formatINR(stats.expected)} />
