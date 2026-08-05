@@ -22,7 +22,7 @@ function Landing() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
           <div className="flex items-center gap-2 font-semibold tracking-tight">
             <FileText className="h-5 w-5 text-accent" />
-            Dealer Invoicing
+            Pro Invoicing
           </div>
           <Link to="/auth">
             <Button size="sm" variant="secondary">Sign in</Button>
