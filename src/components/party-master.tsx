@@ -76,7 +76,9 @@ export function PartyMasterPage({ kind, title, description, detailRoute }: {
                       {d.nickname || d.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-2">{d.name}</td>
+                  <td className="px-4 py-2">
+                    <Link to={detailRoute} params={{ id: d.id! }} className="hover:underline">{d.name}</Link>
+                  </td>
                   <td className="px-4 py-2 font-mono text-xs">{d.invoice_prefix}</td>
                   <td className="px-4 py-2">{d.gstin || "—"}</td>
                   <td className="px-4 py-2">{d.mobile || "—"}</td>
