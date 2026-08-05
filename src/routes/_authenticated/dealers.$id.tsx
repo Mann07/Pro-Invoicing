@@ -191,7 +191,9 @@ function DealerDetail() {
           <Stat label="Partially paid" value={String(stats.partialCount)} />
           <Stat label="Last invoice date" value={stats.lastInvoiceDate ? formatDate(stats.lastInvoiceDate) : "—"} />
           <Stat label="Last payment date" value={lastPaymentDate ? formatDate(lastPaymentDate) : "—"} />
+          <Stat label="Total GST" value={formatINR(stats.gst)} />
           {stats.tds > 0 && (
+
             <>
               <Stat label="Total TDS deducted" value={formatINR(stats.tds)} />
               <Stat label="Expected payment" value={formatINR(stats.expected)} />
