@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Dealer Invoicing" },
       { name: "description", content: "Pro Invoicing — create, track, and manage dealer and vendor invoices with GST, HSN/SAC codes, and Word template rendering." },
-      { property: "og:title", content: "Dealer Invoicing" },
+      { property: "og:title", content: "Pro Invoicing" },
       { property: "og:description", content: "Pro Invoicing — create, track, and manage dealer and vendor invoices with GST, HSN/SAC codes, and Word template rendering." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
