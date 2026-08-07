@@ -44,7 +44,7 @@ function Dashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Four independent modules. Nothing is mixed.</p>
+          <p className="text-sm text-muted-foreground">All independent modules. Nothing is mixed.</p>
         </div>
         <Link to="/invoices/new"><Button><Plus className="mr-2 h-4 w-4" /> New Invoice</Button></Link>
       </div>
