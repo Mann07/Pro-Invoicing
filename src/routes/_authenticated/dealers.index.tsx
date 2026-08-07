@@ -6,7 +6,7 @@ export const Route = createFileRoute("/_authenticated/dealers/")({
     <PartyMasterPage
       kind="dealer"
       title="Dealers"
-      description="Primary business partners (~80% of invoicing). Click a nickname to open the dealer working page."
+      description="Click a nickname to open the dealer working page."
       detailRoute="/dealers/$id"
     />
   ),
