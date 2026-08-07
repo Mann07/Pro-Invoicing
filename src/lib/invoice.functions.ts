@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { toIndianWordsINR } from "@/lib/format";
+import { toIndianWordsINR ,formatDate } from "@/lib/format";
 
 /* ------------------------------------------------------------------ */
 /* Schemas                                                             */
@@ -173,7 +173,7 @@ export const createInvoice = createServerFn({ method: "POST" })
         is_transporter: data.module === "transporter",
         is_customer: data.module === "customer",
         invoice_number,
-        issue_date: data.issue_date,
+        issue_date: formatDate(data.issue_date),
         // Party (dealer/vendor/transporter) mapping
         party_name: safe(party?.name),
         party_nickname: safe(party?.nickname),
