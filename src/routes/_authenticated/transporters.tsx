@@ -1,13 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PartyMasterPage } from "@/components/party-master";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/transporters")({
-  component: () => (
-    <PartyMasterPage
-      kind="transporter"
-      title="Transporters"
-      description="Transporter master with independent numbering, templates, and reports."
-      detailRoute="/transporters/$id"
-    />
-  ),
+  component: () => <Outlet />,
 });
