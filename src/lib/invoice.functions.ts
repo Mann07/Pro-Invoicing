@@ -108,7 +108,7 @@ export const createInvoice = createServerFn({ method: "POST" })
     }
 
     // Determine next sequence & invoice number
-    const dealerScope = data.module === "dealer" ? data.party_id! : null;
+    const dealerScope = data.module === "dealer" || data.module === "transporter" ? data.party_id! : null;
     const { data: seqRes, error: seqErr } = await sb.rpc("next_invoice_seq", {
       _module: data.module,
       _dealer_id: dealerScope,
@@ -455,7 +455,7 @@ export const getNextInvoiceNumber = createServerFn({ method: "POST" })
 
     const { data: seqRes, error } = await sb.rpc("next_invoice_seq", {
       _module: data.module,
-      _dealer_id: data.module === "dealer" ? data.party_id : null,
+      _dealer_id: data.module === "dealer" || data.module === "transporter" ? data.party_id : null,
     });
     if (error) throw new Error(error.message);
     const seq = Number(seqRes);

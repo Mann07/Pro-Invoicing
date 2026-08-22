@@ -36,6 +36,7 @@ export function InvoiceListSection({
     queryFn: async () => {
       let q = (supabase as any).from("invoices").select("*").eq("module", module).order("invoice_seq", { ascending: false });
       if (module === "dealer" && dealerId) q = q.eq("dealer_id", dealerId);
+      if (module === "transporter" && dealerId) q = q.eq("transporter_id", dealerId);
       const { data } = await q;
       return (data ?? []) as any[];
     },
@@ -44,7 +45,7 @@ export function InvoiceListSection({
   const { data: missing = { missing: [] as number[] } } = useQuery({
     queryKey: ["missing", module, dealerId ?? "all"],
     queryFn: () => missingFn({ data: { module, dealer_id: dealerId ?? null } }),
-    enabled: module !== "dealer" || !!dealerId,
+    enabled: (module !== "dealer" && module !== "transporter") || !!dealerId,
   });
 
   const totals = useMemo(() => {
