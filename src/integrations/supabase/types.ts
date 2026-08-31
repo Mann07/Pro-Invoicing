@@ -94,6 +94,10 @@ export type Database = {
           invoice_id: string
           notes: string | null
           paid_on: string
+          payment_mode: string | null
+          tds_amount: number
+          tds_rate: number
+          utr: string | null
         }
         Insert: {
           amount: number
@@ -103,6 +107,10 @@ export type Database = {
           invoice_id: string
           notes?: string | null
           paid_on?: string
+          payment_mode?: string | null
+          tds_amount?: number
+          tds_rate?: number
+          utr?: string | null
         }
         Update: {
           amount?: number
@@ -112,6 +120,10 @@ export type Database = {
           invoice_id?: string
           notes?: string | null
           paid_on?: string
+          payment_mode?: string | null
+          tds_amount?: number
+          tds_rate?: number
+          utr?: string | null
         }
         Relationships: [
           {
