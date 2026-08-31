@@ -110,19 +110,63 @@ function InvoiceDetail() {
   }
 
 
-  async function recordPayment() {
-    const amt = Number(amount);
-    if (!(amt > 0)) return toast.error("Enter a positive amount");
+  function refresh() {
+    qc.invalidateQueries({ queryKey: ["invoice", id] });
+    qc.invalidateQueries({ queryKey: ["payments", id] });
+    qc.invalidateQueries({ queryKey: ["invoices"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+  }
+
+  async function savePayment() {
+    const amt = Number(pay.amount);
+    if (!(amt >= 0) || pay.amount === "") return toast.error("Enter the payment amount received");
     setBusy(true);
     try {
-      const res = await payFn({ data: { invoice_id: id, amount: amt, paid_on: paidOn, notes: payNotes || null } });
-      toast.success(res.status === "paid" ? "Payment complete — invoice finalized and locked" : "Payment recorded");
-      setAmount(""); setPayNotes("");
-      qc.invalidateQueries({ queryKey: ["invoice", id] });
-      qc.invalidateQueries({ queryKey: ["payments", id] });
+      const body = {
+        amount: amt,
+        paid_on: pay.paid_on,
+        tds_rate: Number(pay.tds_rate || 0),
+        tds_amount: Number(pay.tds_amount || 0),
+        payment_mode: pay.payment_mode || null,
+        utr: pay.utr || null,
+        notes: pay.notes || null,
+      };
+      const res = editingId
+        ? await editPayFn({ data: { payment_id: editingId, ...body } })
+        : await payFn({ data: { invoice_id: id, ...body } });
+      toast.success(
+        editingId ? "Payment updated" :
+        res.status === "paid" ? "Payment complete — invoice settled in full" : "Payment recorded",
+      );
+      setPay(emptyPay); setEditingId(null);
+      refresh();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
+
+  function startEdit(p: any) {
+    setEditingId(p.id);
+    setPay({
+      amount: String(p.amount ?? ""),
+      paid_on: p.paid_on,
+      tds_rate: p.tds_rate ? String(p.tds_rate) : "",
+      tds_amount: p.tds_amount ? String(p.tds_amount) : "",
+      payment_mode: p.payment_mode ?? "",
+      utr: p.utr ?? "",
+      notes: p.notes ?? "",
+    });
+  }
+
+  async function removePayment(paymentId: string) {
+    if (!confirm("Delete this payment record?")) return;
+    try {
+      await delPayFn({ data: { payment_id: paymentId } });
+      if (editingId === paymentId) { setEditingId(null); setPay(emptyPay); }
+      toast.success("Payment deleted");
+      refresh();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
 
   async function cancel() {
     if (!confirm("Cancel this invoice? The number stays reserved.")) return;
