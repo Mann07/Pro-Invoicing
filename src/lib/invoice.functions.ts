@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { toIndianWordsINR ,formatDate } from "@/lib/format";
+import { gstSplit, reconcile } from "@/lib/tds";
+
 
 /* ------------------------------------------------------------------ */
 /* Schemas                                                             */
@@ -206,10 +208,18 @@ export const createInvoice = createServerFn({ method: "POST" })
         subtotal: subtotal.toFixed(2),
         gst_rate: data.gst_rate.toFixed(2),
         gst_amount: gst_amount.toFixed(2),
+        // Intra-state split — templates use {cgst} / {sgst}
+        cgst: gstSplit(gst_amount).cgst.toFixed(2),
+        sgst: gstSplit(gst_amount).sgst.toFixed(2),
+        cgst_rate: (data.gst_rate / 2).toFixed(2),
+        sgst_rate: (data.gst_rate / 2).toFixed(2),
         total: total.toFixed(2),
         tds_rate: tds_rate.toFixed(2),
         tds_amount: tds_amount.toFixed(2),
+        expected_tds_rate: tds_rate.toFixed(2),
+        expected_tds_amount: tds_amount.toFixed(2),
         expected_payment: expected_payment.toFixed(2),
+
         amount_in_words: toIndianWordsINR(total),
         notes: safe(data.notes),
       };
@@ -293,52 +303,96 @@ export const getInvoiceDownloadUrl = createServerFn({ method: "POST" })
   });
 
 /* ------------------------------------------------------------------ */
-/* Payments — record + auto-update status                              */
+/* Payments — record / edit / delete + auto-update status              */
 /* ------------------------------------------------------------------ */
+
+const PaymentFields = z.object({
+  amount: z.number().nonnegative(),
+  paid_on: z.string(),
+  tds_rate: z.number().min(0).max(100).optional(),
+  tds_amount: z.number().min(0).optional(),
+  payment_mode: z.string().optional().nullable(),
+  utr: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+/** Recompute amount_paid + status from ALL payments of an invoice. */
+async function recalcInvoice(sb: any, invoiceId: string) {
+  const { data: inv } = await sb.from("invoices").select("*").eq("id", invoiceId).maybeSingle();
+  if (!inv) throw new Error("Invoice not found");
+  const { data: pays } = await sb.from("invoice_payments").select("amount, tds_amount").eq("invoice_id", invoiceId);
+  const r = reconcile(inv, (pays ?? []) as any[]);
+  const patch: any = { amount_paid: r.received };
+  if (inv.status !== "cancelled") {
+    patch.status = r.status;
+    patch.finalized_at = r.status === "paid" ? (inv.finalized_at ?? new Date().toISOString()) : null;
+  }
+  const { error } = await sb.from("invoices").update(patch).eq("id", invoiceId);
+  if (error) throw new Error(error.message);
+  return { ok: true, status: patch.status ?? inv.status, amount_paid: r.received, outstanding: r.outstanding, actual_tds: r.actualTds };
+}
 
 export const addPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
-    z.object({
-      invoice_id: z.string().uuid(),
-      amount: z.number().positive(),
-      paid_on: z.string(),
-      notes: z.string().optional().nullable(),
-    }).parse(data),
+    PaymentFields.extend({ invoice_id: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { data: inv, error: iErr } = await sb.from("invoices").select("*").eq("id", data.invoice_id).maybeSingle();
+    const { data: inv, error: iErr } = await sb.from("invoices").select("status").eq("id", data.invoice_id).maybeSingle();
     if (iErr) throw new Error(iErr.message);
     if (!inv) throw new Error("Invoice not found");
     if (inv.status === "cancelled") throw new Error("Cannot add payment to a cancelled invoice");
-    if (inv.status === "paid") throw new Error("Invoice is already paid and locked");
 
     const { error: payErr } = await sb.from("invoice_payments").insert({
       invoice_id: data.invoice_id,
       amount: data.amount,
       paid_on: data.paid_on,
+      tds_rate: data.tds_rate ?? 0,
+      tds_amount: data.tds_amount ?? 0,
+      payment_mode: data.payment_mode ?? null,
+      utr: data.utr ?? null,
       notes: data.notes ?? null,
       created_by: context.userId,
     });
     if (payErr) throw new Error(payErr.message);
-
-    const newPaid = Number(inv.amount_paid) + Number(data.amount);
-    const total = Number(inv.total);
-    // Dealers deduct TDS on the subtotal; the expected receipt is total − TDS.
-    const tdsAmount = Number(inv.tds_amount ?? 0);
-    const expected = +(total - tdsAmount).toFixed(2);
-    let nextStatus: "pending" | "partial" | "paid" = "pending";
-    if (newPaid + 0.01 >= expected) nextStatus = "paid";
-    else if (newPaid > 0) nextStatus = "partial";
-
-    const patch: any = { amount_paid: newPaid, status: nextStatus };
-    if (nextStatus === "paid") patch.finalized_at = new Date().toISOString();
-
-    const { error: uErr } = await sb.from("invoices").update(patch).eq("id", data.invoice_id);
-    if (uErr) throw new Error(uErr.message);
-    return { ok: true, status: nextStatus, amount_paid: newPaid };
+    return await recalcInvoice(sb, data.invoice_id);
   });
+
+export const updatePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    PaymentFields.extend({ payment_id: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: pay } = await sb.from("invoice_payments").select("invoice_id").eq("id", data.payment_id).maybeSingle();
+    if (!pay) throw new Error("Payment not found");
+    const { error } = await sb.from("invoice_payments").update({
+      amount: data.amount,
+      paid_on: data.paid_on,
+      tds_rate: data.tds_rate ?? 0,
+      tds_amount: data.tds_amount ?? 0,
+      payment_mode: data.payment_mode ?? null,
+      utr: data.utr ?? null,
+      notes: data.notes ?? null,
+    }).eq("id", data.payment_id);
+    if (error) throw new Error(error.message);
+    return await recalcInvoice(sb, pay.invoice_id);
+  });
+
+export const deletePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ payment_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { data: pay } = await sb.from("invoice_payments").select("invoice_id").eq("id", data.payment_id).maybeSingle();
+    if (!pay) return { ok: true, status: "pending", amount_paid: 0, outstanding: 0, actual_tds: 0 };
+    const { error } = await sb.from("invoice_payments").delete().eq("id", data.payment_id);
+    if (error) throw new Error(error.message);
+    return await recalcInvoice(sb, pay.invoice_id);
+  });
+
 
 /* ------------------------------------------------------------------ */
 /* Cancel invoice (reserves the number)                                */
