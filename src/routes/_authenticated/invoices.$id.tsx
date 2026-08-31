@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { addPayment, cancelInvoice, getInvoiceDownloadUrl, ensureInvoicePdf, deleteInvoicePermanently } from "@/lib/invoice.functions";
+import { addPayment, updatePayment, deletePayment, cancelInvoice, getInvoiceDownloadUrl, ensureInvoicePdf, deleteInvoicePermanently } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
+import { gstSplit, reconcile } from "@/lib/tds";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
   component: InvoiceDetail,
