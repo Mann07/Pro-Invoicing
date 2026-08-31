@@ -206,10 +206,18 @@ export const createInvoice = createServerFn({ method: "POST" })
         subtotal: subtotal.toFixed(2),
         gst_rate: data.gst_rate.toFixed(2),
         gst_amount: gst_amount.toFixed(2),
+        // Intra-state split — templates use {cgst} / {sgst}
+        cgst: gstSplit(gst_amount).cgst.toFixed(2),
+        sgst: gstSplit(gst_amount).sgst.toFixed(2),
+        cgst_rate: (data.gst_rate / 2).toFixed(2),
+        sgst_rate: (data.gst_rate / 2).toFixed(2),
         total: total.toFixed(2),
         tds_rate: tds_rate.toFixed(2),
         tds_amount: tds_amount.toFixed(2),
+        expected_tds_rate: tds_rate.toFixed(2),
+        expected_tds_amount: tds_amount.toFixed(2),
         expected_payment: expected_payment.toFixed(2),
+
         amount_in_words: toIndianWordsINR(total),
         notes: safe(data.notes),
       };
