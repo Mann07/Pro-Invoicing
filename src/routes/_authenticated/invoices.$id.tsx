@@ -60,9 +60,9 @@ function InvoiceDetail() {
     enabled: !!inv,
   });
 
-  const [amount, setAmount] = useState("");
-  const [paidOn, setPaidOn] = useState(todayISO());
-  const [payNotes, setPayNotes] = useState("");
+  const emptyPay = { amount: "", paid_on: todayISO(), tds_rate: "", tds_amount: "", payment_mode: "", utr: "", notes: "" };
+  const [pay, setPay] = useState(emptyPay);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [regenBusy, setRegenBusy] = useState(false);
@@ -71,9 +71,20 @@ function InvoiceDetail() {
   if (!inv) return <div className="p-6">Not found. <Link to="/dashboard" className="text-primary underline">Back</Link></div>;
 
   const locked = inv.status === "paid" || inv.status === "cancelled";
-  const tdsAmount = Number(inv.tds_amount ?? 0);
-  const expectedPayment = +(Number(inv.total) - tdsAmount).toFixed(2);
-  const outstanding = Math.max(0, expectedPayment - Number(inv.amount_paid));
+  const { cgst, sgst } = gstSplit(inv.gst_amount);
+  const r = reconcile(inv, payments as any[]);
+  const outstanding = r.outstanding;
+
+  function setTdsRate(v: string) {
+    const rate = Number(v || 0);
+    setPay((p) => ({ ...p, tds_rate: v, tds_amount: v === "" ? "" : (Number(inv.subtotal) * rate / 100).toFixed(2) }));
+  }
+  function setTdsAmount(v: string) {
+    const amt = Number(v || 0);
+    const sub = Number(inv.subtotal) || 0;
+    setPay((p) => ({ ...p, tds_amount: v, tds_rate: v === "" || !sub ? "" : ((amt / sub) * 100).toFixed(2) }));
+  }
+
 
   async function downloadDocx() {
     if (!inv.docx_path) return toast.error("No DOCX generated (no active template).");
