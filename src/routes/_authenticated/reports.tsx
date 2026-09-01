@@ -72,6 +72,27 @@ function ModuleReport({ module }: { module: ModuleId }) {
     queryFn: async () => (await (supabase as any).from("invoices").select("*").eq("module", module).order("issue_date", { ascending: false })).data ?? [],
   });
 
+  const invoiceIds = (invoices as any[]).map((i) => i.id);
+  const { data: payments = [] } = useQuery({
+    queryKey: ["report-payments", module, invoiceIds.length],
+    queryFn: async () => {
+      if (invoiceIds.length === 0) return [] as any[];
+      const { data } = await (supabase as any)
+        .from("invoice_payments")
+        .select("invoice_id, amount, tds_amount")
+        .in("invoice_id", invoiceIds);
+      return (data ?? []) as any[];
+    },
+    enabled: invoiceIds.length > 0,
+  });
+
+  // Actual TDS recorded against each invoice's payments.
+  const actualTdsById = useMemo(() => {
+    const map = new Map<string, number>();
+    (payments as any[]).forEach((p) => map.set(p.invoice_id, (map.get(p.invoice_id) ?? 0) + Number(p.tds_amount ?? 0)));
+    return map;
+  }, [payments]);
+
   const { data: parties = [] } = useQuery({
     queryKey: ["report-parties", partyTable ?? "none"],
     queryFn: async () => partyTable ? ((await (supabase as any).from(partyTable).select("id, name, nickname, invoice_prefix")).data ?? []) : [],
@@ -107,12 +128,19 @@ function ModuleReport({ module }: { module: ModuleId }) {
       });
   }, [invoices, partyById, partyTable, partyKey, f]);
 
+  const actualTdsOf = (inv: any) => actualTdsById.get(inv.id) ?? 0;
   const active = rows.filter((r) => r.inv.status !== "cancelled");
   const summary = {
     count: rows.length,
     revenue: active.reduce((s, r) => s + Number(r.inv.total), 0),
     paid: active.reduce((s, r) => s + Number(r.inv.amount_paid), 0),
-    outstanding: active.reduce((s, r) => s + Number(r.inv.total) - Number(r.inv.amount_paid), 0),
+    outstanding: active.reduce(
+      (s, r) => s + Math.max(0, Number(r.inv.total) - Number(r.inv.amount_paid) - actualTdsOf(r.inv)),
+      0,
+    ),
+    gst: active.reduce((s, r) => s + Number(r.inv.gst_amount ?? 0), 0),
+    expectedTds: active.reduce((s, r) => s + Number(r.inv.tds_amount ?? 0), 0),
+    actualTds: active.reduce((s, r) => s + actualTdsOf(r.inv), 0),
   };
 
   function exportInvoices() {
@@ -125,9 +153,14 @@ function ModuleReport({ module }: { module: ModuleId }) {
       "Subtotal": Number(inv.subtotal),
       "GST %": Number(inv.gst_rate),
       "GST Amount": Number(inv.gst_amount),
+      "CGST": +(Number(inv.gst_amount ?? 0) / 2).toFixed(2),
+      "SGST": +(Number(inv.gst_amount ?? 0) - Number(inv.gst_amount ?? 0) / 2).toFixed(2),
       "Total": Number(inv.total),
+      "Expected TDS": Number(inv.tds_amount ?? 0),
+      "Actual TDS": actualTdsOf(inv),
+      "TDS Difference": +(actualTdsOf(inv) - Number(inv.tds_amount ?? 0)).toFixed(2),
       "Paid": Number(inv.amount_paid),
-      "Outstanding": Number(inv.total) - Number(inv.amount_paid),
+      "Outstanding": Math.max(0, Number(inv.total) - Number(inv.amount_paid) - actualTdsOf(inv)),
       "Status": inv.status,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -186,6 +219,10 @@ function ModuleReport({ module }: { module: ModuleId }) {
         <Stat label="Total invoice amount" value={formatINR(summary.revenue)} />
         <Stat label="Total paid" value={formatINR(summary.paid)} />
         <Stat label="Total outstanding" value={formatINR(summary.outstanding)} />
+        <Stat label="Total GST" value={formatINR(summary.gst)} />
+        <Stat label="Expected TDS" value={formatINR(summary.expectedTds)} />
+        <Stat label="Total TDS (actual)" value={formatINR(summary.actualTds)} />
+        <Stat label="TDS difference" value={formatINR(summary.actualTds - summary.expectedTds)} />
       </div>
 
       <div className="overflow-x-auto rounded-lg border bg-card">
@@ -199,6 +236,8 @@ function ModuleReport({ module }: { module: ModuleId }) {
                 <th className="px-4 py-2">Date</th>
                 <th className="px-4 py-2">Party</th>
                 <th className="px-4 py-2 text-right">Total</th>
+                <th className="px-4 py-2 text-right">Exp. TDS</th>
+                <th className="px-4 py-2 text-right">Actual TDS</th>
                 <th className="px-4 py-2 text-right">Paid</th>
                 <th className="px-4 py-2 text-right">Outstanding</th>
                 <th className="px-4 py-2">Status</th>
@@ -215,8 +254,10 @@ function ModuleReport({ module }: { module: ModuleId }) {
                   <td className="px-4 py-2">{formatDate(inv.issue_date)}</td>
                   <td className="px-4 py-2">{party?.nickname || party?.name || inv.customer_name || "—"}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.total)}</td>
+                  <td className="px-4 py-2 text-right">{formatINR(inv.tds_amount ?? 0)}</td>
+                  <td className="px-4 py-2 text-right">{formatINR(actualTdsOf(inv))}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.amount_paid)}</td>
-                  <td className="px-4 py-2 text-right">{formatINR(Number(inv.total) - Number(inv.amount_paid))}</td>
+                  <td className="px-4 py-2 text-right">{formatINR(Math.max(0, Number(inv.total) - Number(inv.amount_paid) - actualTdsOf(inv)))}</td>
                   <td className="px-4 py-2 capitalize">{inv.status}</td>
                 </tr>
               ))}

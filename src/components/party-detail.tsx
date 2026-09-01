@@ -71,24 +71,28 @@ export function PartyDetailPage({
   });
 
   const invoiceIds = (invoices as any[]).map((i) => i.id);
-  const { data: lastPaymentDate } = useQuery({
-    queryKey: [kind, "last-payment", id, invoiceIds.length],
+  const { data: payments = [] } = useQuery({
+    queryKey: [kind, "payments", id, invoiceIds.length],
     queryFn: async () => {
-      if (invoiceIds.length === 0) return null;
+      if (invoiceIds.length === 0) return [] as any[];
       const { data } = await (supabase as any)
         .from("invoice_payments")
-        .select("paid_on")
+        .select("paid_on, amount, tds_amount, invoice_id")
         .in("invoice_id", invoiceIds)
-        .order("paid_on", { ascending: false })
-        .limit(1);
-      return (data?.[0]?.paid_on ?? null) as string | null;
+        .order("paid_on", { ascending: false });
+      return (data ?? []) as any[];
     },
     enabled: invoiceIds.length > 0,
   });
+  const lastPaymentDate = (payments as any[])[0]?.paid_on ?? null;
 
   const stats = useMemo(() => {
     const active = (invoices as any[]).filter((i) => i.status !== "cancelled");
+    const activeIds = new Set(active.map((i) => i.id));
     const tds = active.reduce((s, i) => s + Number(i.tds_amount ?? 0), 0);
+    const actualTds = (payments as any[])
+      .filter((p) => activeIds.has(p.invoice_id))
+      .reduce((s, p) => s + Number(p.tds_amount ?? 0), 0);
     const value = active.reduce((s, i) => s + Number(i.total), 0);
     const paid = active.reduce((s, i) => s + Number(i.amount_paid), 0);
     const gst = active.reduce((s, i) => s + Number(i.gst_amount ?? 0), 0);
@@ -103,9 +107,11 @@ export function PartyDetailPage({
       partialCount: active.filter((i) => i.status === "partial").length,
       lastInvoiceDate: active.map((i) => i.issue_date).sort().at(-1) ?? null,
       tds,
+      actualTds,
+      tdsDifference: +(actualTds - tds).toFixed(2),
       expected: value - tds,
     };
-  }, [invoices]);
+  }, [invoices, payments]);
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -206,9 +212,11 @@ export function PartyDetailPage({
           <Stat label="Last invoice date" value={stats.lastInvoiceDate ? formatDate(stats.lastInvoiceDate) : "—"} />
           <Stat label="Last payment date" value={lastPaymentDate ? formatDate(lastPaymentDate) : "—"} />
           <Stat label="Total GST" value={formatINR(stats.gst)} />
-          {stats.tds > 0 && (
+          <Stat label="Total TDS (actual)" value={formatINR(stats.actualTds)} />
+          {(stats.tds > 0 || stats.actualTds > 0) && (
             <>
-              <Stat label="Total TDS deducted" value={formatINR(stats.tds)} />
+              <Stat label="Expected TDS" value={formatINR(stats.tds)} />
+              <Stat label="TDS difference" value={formatINR(stats.tdsDifference)} />
               <Stat label="Expected payment" value={formatINR(stats.expected)} />
               <Stat label="Actual payment received" value={formatINR(stats.paid)} />
             </>
