@@ -87,6 +87,8 @@ function ModuleSummary({ module }: { module: ModuleId }) {
         <Stat label="Total invoice value" value={formatINR(data.revenue)} />
         <Stat label="Total paid" value={formatINR(data.collected)} />
         <Stat label="Total outstanding" value={formatINR(data.outstanding)} accent />
+        <Stat label="Total GST" value={formatINR(data.gst)} />
+        <Stat label="Total TDS (actual)" value={formatINR(data.actualTds)} />
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         <Stat label="Pending invoices" value={String(data.pending)} />
