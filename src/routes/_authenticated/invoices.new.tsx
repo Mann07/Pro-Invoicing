@@ -249,21 +249,27 @@ function NewInvoice() {
           </div>
           {tdsEnabled && (
             <div className="space-y-2">
-              <Label>TDS rate (%)</Label>
+              <Label>Expected TDS rate (%)</Label>
               <Input type="number" step="0.01" value={tdsRate} onChange={(e) => setTdsRate(Number(e.target.value))} />
-              <p className="text-xs text-muted-foreground">Calculated on the subtotal (before GST). Affects payment reconciliation only.</p>
+              <p className="text-xs text-muted-foreground">Expected only — calculated on the subtotal (before GST). Actual TDS is recorded when you enter the payment.</p>
             </div>
           )}
           <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></div>
         </div>
         <div className="space-y-2 rounded-md bg-muted p-4">
           <Row label="Subtotal" value={formatINR(subtotal)} />
-          {gstEnabled && <Row label={`GST @ ${gstRate}%`} value={formatINR(gstAmt)} />}
+          {gstEnabled && (
+            <>
+              <Row label={`CGST @ ${cgstRate}%`} value={formatINR(cgst)} />
+              <Row label={`SGST @ ${sgstRate}%`} value={formatINR(sgst)} />
+              <Row label={`Total GST @ ${gstRate}%`} value={formatINR(gstAmt)} />
+            </>
+          )}
           <div className="my-2 border-t" />
           <Row label="Invoice total" value={formatINR(total)} bold />
           {tdsEnabled && tdsAmt > 0 && (
             <>
-              <Row label={`TDS @ ${tdsRate}% (on subtotal)`} value={`− ${formatINR(tdsAmt)}`} />
+              <Row label={`Expected TDS @ ${tdsRate}% (on subtotal)`} value={`− ${formatINR(tdsAmt)}`} />
               <Row label="Expected payment" value={formatINR(expectedPayment)} bold />
             </>
           )}
