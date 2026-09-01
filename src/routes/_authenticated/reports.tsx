@@ -254,8 +254,10 @@ function ModuleReport({ module }: { module: ModuleId }) {
                   <td className="px-4 py-2">{formatDate(inv.issue_date)}</td>
                   <td className="px-4 py-2">{party?.nickname || party?.name || inv.customer_name || "—"}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.total)}</td>
+                  <td className="px-4 py-2 text-right">{formatINR(inv.tds_amount ?? 0)}</td>
+                  <td className="px-4 py-2 text-right">{formatINR(actualTdsOf(inv))}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.amount_paid)}</td>
-                  <td className="px-4 py-2 text-right">{formatINR(Number(inv.total) - Number(inv.amount_paid))}</td>
+                  <td className="px-4 py-2 text-right">{formatINR(Math.max(0, Number(inv.total) - Number(inv.amount_paid) - actualTdsOf(inv)))}</td>
                   <td className="px-4 py-2 capitalize">{inv.status}</td>
                 </tr>
               ))}
