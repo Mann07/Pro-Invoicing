@@ -128,12 +128,19 @@ function ModuleReport({ module }: { module: ModuleId }) {
       });
   }, [invoices, partyById, partyTable, partyKey, f]);
 
+  const actualTdsOf = (inv: any) => actualTdsById.get(inv.id) ?? 0;
   const active = rows.filter((r) => r.inv.status !== "cancelled");
   const summary = {
     count: rows.length,
     revenue: active.reduce((s, r) => s + Number(r.inv.total), 0),
     paid: active.reduce((s, r) => s + Number(r.inv.amount_paid), 0),
-    outstanding: active.reduce((s, r) => s + Number(r.inv.total) - Number(r.inv.amount_paid), 0),
+    outstanding: active.reduce(
+      (s, r) => s + Math.max(0, Number(r.inv.total) - Number(r.inv.amount_paid) - actualTdsOf(r.inv)),
+      0,
+    ),
+    gst: active.reduce((s, r) => s + Number(r.inv.gst_amount ?? 0), 0),
+    expectedTds: active.reduce((s, r) => s + Number(r.inv.tds_amount ?? 0), 0),
+    actualTds: active.reduce((s, r) => s + actualTdsOf(r.inv), 0),
   };
 
   function exportInvoices() {
@@ -146,9 +153,14 @@ function ModuleReport({ module }: { module: ModuleId }) {
       "Subtotal": Number(inv.subtotal),
       "GST %": Number(inv.gst_rate),
       "GST Amount": Number(inv.gst_amount),
+      "CGST": +(Number(inv.gst_amount ?? 0) / 2).toFixed(2),
+      "SGST": +(Number(inv.gst_amount ?? 0) - Number(inv.gst_amount ?? 0) / 2).toFixed(2),
       "Total": Number(inv.total),
+      "Expected TDS": Number(inv.tds_amount ?? 0),
+      "Actual TDS": actualTdsOf(inv),
+      "TDS Difference": +(actualTdsOf(inv) - Number(inv.tds_amount ?? 0)).toFixed(2),
       "Paid": Number(inv.amount_paid),
-      "Outstanding": Number(inv.total) - Number(inv.amount_paid),
+      "Outstanding": Math.max(0, Number(inv.total) - Number(inv.amount_paid) - actualTdsOf(inv)),
       "Status": inv.status,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
