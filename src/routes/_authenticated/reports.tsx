@@ -72,6 +72,27 @@ function ModuleReport({ module }: { module: ModuleId }) {
     queryFn: async () => (await (supabase as any).from("invoices").select("*").eq("module", module).order("issue_date", { ascending: false })).data ?? [],
   });
 
+  const invoiceIds = (invoices as any[]).map((i) => i.id);
+  const { data: payments = [] } = useQuery({
+    queryKey: ["report-payments", module, invoiceIds.length],
+    queryFn: async () => {
+      if (invoiceIds.length === 0) return [] as any[];
+      const { data } = await (supabase as any)
+        .from("invoice_payments")
+        .select("invoice_id, amount, tds_amount")
+        .in("invoice_id", invoiceIds);
+      return (data ?? []) as any[];
+    },
+    enabled: invoiceIds.length > 0,
+  });
+
+  // Actual TDS recorded against each invoice's payments.
+  const actualTdsById = useMemo(() => {
+    const map = new Map<string, number>();
+    (payments as any[]).forEach((p) => map.set(p.invoice_id, (map.get(p.invoice_id) ?? 0) + Number(p.tds_amount ?? 0)));
+    return map;
+  }, [payments]);
+
   const { data: parties = [] } = useQuery({
     queryKey: ["report-parties", partyTable ?? "none"],
     queryFn: async () => partyTable ? ((await (supabase as any).from(partyTable).select("id, name, nickname, invoice_prefix")).data ?? []) : [],
