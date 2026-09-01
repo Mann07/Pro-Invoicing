@@ -34,6 +34,8 @@ function InvoiceDetail() {
   const payFn = useServerFn(addPayment);
   const cancelFn = useServerFn(cancelInvoice);
   const pdfFn = useServerFn(ensureInvoicePdf);
+  const editPayFn = useServerFn(updatePayment);
+  const delPayFn = useServerFn(deletePayment);
   const deleteFn = useServerFn(deleteInvoicePermanently);
 
   const { data: inv, isLoading } = useQuery({
