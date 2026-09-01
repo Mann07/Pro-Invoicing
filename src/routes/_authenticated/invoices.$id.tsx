@@ -34,6 +34,8 @@ function InvoiceDetail() {
   const payFn = useServerFn(addPayment);
   const cancelFn = useServerFn(cancelInvoice);
   const pdfFn = useServerFn(ensureInvoicePdf);
+  const editPayFn = useServerFn(updatePayment);
+  const delPayFn = useServerFn(deletePayment);
   const deleteFn = useServerFn(deleteInvoicePermanently);
 
   const { data: inv, isLoading } = useQuery({
@@ -283,17 +285,22 @@ function InvoiceDetail() {
         <div className="border-t p-4">
           <div className="ml-auto max-w-xs space-y-1 text-sm">
             <Row label="Subtotal" value={formatINR(inv.subtotal)} />
-            <Row label={`GST @ ${inv.gst_rate}%`} value={formatINR(inv.gst_amount)} />
+            <Row label={`CGST @ ${(Number(inv.gst_rate) / 2).toFixed(2)}%`} value={formatINR(cgst)} />
+            <Row label={`SGST @ ${(Number(inv.gst_rate) / 2).toFixed(2)}%`} value={formatINR(sgst)} />
             <div className="my-1 border-t" />
             <Row label="Invoice total" value={formatINR(inv.total)} bold />
-            {tdsAmount > 0 && (
+            {r.expectedTds > 0 && (
               <>
-                <Row label={`TDS @ ${inv.tds_rate}% (on subtotal)`} value={`− ${formatINR(tdsAmount)}`} />
-                <Row label="Expected payment" value={formatINR(expectedPayment)} bold />
+                <Row label={`Expected TDS @ ${inv.tds_rate}% (on subtotal)`} value={`− ${formatINR(r.expectedTds)}`} />
+                <Row label="Expected payment" value={formatINR(r.expectedPayment)} />
               </>
             )}
-            <Row label="Paid" value={formatINR(inv.amount_paid)} />
-            <Row label="Outstanding" value={formatINR(outstanding)} />
+            {r.actualTds > 0 && <Row label="Actual TDS deducted" value={formatINR(r.actualTds)} />}
+            {r.actualTds > 0 && r.tdsDifference !== 0 && (
+              <Row label="TDS difference" value={formatINR(Math.abs(r.tdsDifference))} />
+            )}
+            <Row label="Payment received" value={formatINR(r.received)} />
+            <Row label="Outstanding" value={formatINR(outstanding)} bold />
           </div>
         </div>
         <div className="border-t p-4 text-sm">
@@ -304,14 +311,21 @@ function InvoiceDetail() {
 
       {!locked && (
         <div className="rounded-lg border bg-card p-5">
-          <h2 className="font-semibold">Record payment</h2>
+          <h2 className="font-semibold">{editingId ? "Edit payment" : "Record payment"}</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-4">
-            <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Paid on</Label><Input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} /></div>
-            <div className="space-y-2 md:col-span-2"><Label>Notes</Label><Input value={payNotes} onChange={(e) => setPayNotes(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Payment received</Label><Input type="number" step="0.01" value={pay.amount} onChange={(e) => setPay((p) => ({ ...p, amount: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>Actual TDS %</Label><Input type="number" step="0.01" value={pay.tds_rate} onChange={(e) => setTdsRate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Actual TDS amount</Label><Input type="number" step="0.01" value={pay.tds_amount} onChange={(e) => setTdsAmount(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Paid on</Label><Input type="date" value={pay.paid_on} onChange={(e) => setPay((p) => ({ ...p, paid_on: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>Payment mode</Label><Input value={pay.payment_mode} onChange={(e) => setPay((p) => ({ ...p, payment_mode: e.target.value }))} placeholder="NEFT / UPI / Cheque" /></div>
+            <div className="space-y-2"><Label>UTR / Ref</Label><Input value={pay.utr} onChange={(e) => setPay((p) => ({ ...p, utr: e.target.value }))} /></div>
+            <div className="space-y-2 md:col-span-2"><Label>Notes</Label><Input value={pay.notes} onChange={(e) => setPay((p) => ({ ...p, notes: e.target.value }))} /></div>
           </div>
-          <div className="mt-3 text-xs text-muted-foreground">Outstanding: {formatINR(outstanding)}. When paid in full the invoice locks automatically.</div>
-          <div className="mt-3 flex justify-end"><Button disabled={busy} onClick={recordPayment}>Record payment</Button></div>
+          <div className="mt-3 text-xs text-muted-foreground">Outstanding: {formatINR(outstanding)}. Settlement = payment received + actual TDS. When settled in full the invoice locks automatically.</div>
+          <div className="mt-3 flex justify-end gap-2">
+            {editingId && <Button variant="outline" onClick={() => { setEditingId(null); setPay(emptyPay); }}>Cancel edit</Button>}
+            <Button disabled={busy} onClick={savePayment}>{editingId ? "Save changes" : "Record payment"}</Button>
+          </div>
         </div>
       )}
 
@@ -319,10 +333,27 @@ function InvoiceDetail() {
         <h2 className="font-semibold">Payment history</h2>
         {(payments as any[]).length === 0 ? <div className="mt-2 text-sm text-muted-foreground">No payments recorded.</div> :
           <table className="mt-3 w-full text-sm">
-            <thead className="text-left text-xs uppercase text-muted-foreground"><tr><th>Date</th><th>Amount</th><th>Notes</th></tr></thead>
+            <thead className="text-left text-xs uppercase text-muted-foreground">
+              <tr><th className="py-1">Date</th><th>Received</th><th>Actual TDS</th><th>Mode</th><th>UTR</th><th>Notes</th><th /></tr>
+            </thead>
             <tbody className="divide-y">
               {(payments as any[]).map((p) => (
-                <tr key={p.id}><td className="py-2">{formatDate(p.paid_on)}</td><td>{formatINR(p.amount)}</td><td className="text-muted-foreground">{p.notes || "—"}</td></tr>
+                <tr key={p.id}>
+                  <td className="py-2">{formatDate(p.paid_on)}</td>
+                  <td>{formatINR(p.amount)}</td>
+                  <td>{Number(p.tds_amount) ? `${formatINR(p.tds_amount)} (${p.tds_rate}%)` : "—"}</td>
+                  <td className="text-muted-foreground">{p.payment_mode || "—"}</td>
+                  <td className="text-muted-foreground">{p.utr || "—"}</td>
+                  <td className="text-muted-foreground">{p.notes || "—"}</td>
+                  <td className="text-right whitespace-nowrap">
+                    {!locked && (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(p)}>Edit</Button>
+                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => removePayment(p.id)}>Delete</Button>
+                      </>
+                    )}
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>}
