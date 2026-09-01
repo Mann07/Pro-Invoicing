@@ -219,6 +219,10 @@ function ModuleReport({ module }: { module: ModuleId }) {
         <Stat label="Total invoice amount" value={formatINR(summary.revenue)} />
         <Stat label="Total paid" value={formatINR(summary.paid)} />
         <Stat label="Total outstanding" value={formatINR(summary.outstanding)} />
+        <Stat label="Total GST" value={formatINR(summary.gst)} />
+        <Stat label="Expected TDS" value={formatINR(summary.expectedTds)} />
+        <Stat label="Total TDS (actual)" value={formatINR(summary.actualTds)} />
+        <Stat label="TDS difference" value={formatINR(summary.actualTds - summary.expectedTds)} />
       </div>
 
       <div className="overflow-x-auto rounded-lg border bg-card">
@@ -232,6 +236,8 @@ function ModuleReport({ module }: { module: ModuleId }) {
                 <th className="px-4 py-2">Date</th>
                 <th className="px-4 py-2">Party</th>
                 <th className="px-4 py-2 text-right">Total</th>
+                <th className="px-4 py-2 text-right">Exp. TDS</th>
+                <th className="px-4 py-2 text-right">Actual TDS</th>
                 <th className="px-4 py-2 text-right">Paid</th>
                 <th className="px-4 py-2 text-right">Outstanding</th>
                 <th className="px-4 py-2">Status</th>
