@@ -18,17 +18,31 @@ function useModuleTotals(module: ModuleId) {
       // Stats are computed from ALL invoices of the module, not just recent ones.
       const { data } = await (supabase as any)
         .from("invoices")
-        .select("id,total,amount_paid,tds_amount,status,invoice_number,issue_date")
+        .select("id,total,amount_paid,tds_amount,gst_amount,status,invoice_number,issue_date")
         .eq("module", module)
         .order("issue_date", { ascending: false });
       const rows = (data ?? []) as any[];
       const active = rows.filter((r) => r.status !== "cancelled");
       const expected = (r: any) => Number(r.total) - Number(r.tds_amount ?? 0);
+
+      // Actual TDS comes from recorded payments, not the expected rate on the invoice.
+      const activeIds = active.map((r) => r.id);
+      let actualTds = 0;
+      if (activeIds.length > 0) {
+        const { data: pays } = await (supabase as any)
+          .from("invoice_payments")
+          .select("tds_amount")
+          .in("invoice_id", activeIds);
+        actualTds = ((pays ?? []) as any[]).reduce((s, p) => s + Number(p.tds_amount ?? 0), 0);
+      }
+
       return {
         count: active.length,
         revenue: active.reduce((s, r) => s + Number(r.total), 0),
         collected: active.reduce((s, r) => s + Number(r.amount_paid), 0),
         outstanding: active.reduce((s, r) => s + Math.max(0, expected(r) - Number(r.amount_paid)), 0),
+        gst: active.reduce((s, r) => s + Number(r.gst_amount ?? 0), 0),
+        actualTds,
         pending: active.filter((r) => r.status === "pending" || r.status === "draft").length,
         partial: active.filter((r) => r.status === "partial").length,
         paid: active.filter((r) => r.status === "paid").length,
