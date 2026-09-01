@@ -198,10 +198,11 @@ function DealerDetail() {
           <Stat label="Last invoice date" value={stats.lastInvoiceDate ? formatDate(stats.lastInvoiceDate) : "—"} />
           <Stat label="Last payment date" value={lastPaymentDate ? formatDate(lastPaymentDate) : "—"} />
           <Stat label="Total GST" value={formatINR(stats.gst)} />
-          {stats.tds > 0 && (
-
+          <Stat label="Total TDS (actual)" value={formatINR(stats.actualTds)} />
+          {(stats.tds > 0 || stats.actualTds > 0) && (
             <>
-              <Stat label="Total TDS deducted" value={formatINR(stats.tds)} />
+              <Stat label="Expected TDS" value={formatINR(stats.tds)} />
+              <Stat label="TDS difference" value={formatINR(stats.tdsDifference)} />
               <Stat label="Expected payment" value={formatINR(stats.expected)} />
               <Stat label="Actual payment received" value={formatINR(stats.paid)} />
             </>
