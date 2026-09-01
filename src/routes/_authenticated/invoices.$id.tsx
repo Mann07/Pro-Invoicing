@@ -285,17 +285,22 @@ function InvoiceDetail() {
         <div className="border-t p-4">
           <div className="ml-auto max-w-xs space-y-1 text-sm">
             <Row label="Subtotal" value={formatINR(inv.subtotal)} />
-            <Row label={`GST @ ${inv.gst_rate}%`} value={formatINR(inv.gst_amount)} />
+            <Row label={`CGST @ ${(Number(inv.gst_rate) / 2).toFixed(2)}%`} value={formatINR(cgst)} />
+            <Row label={`SGST @ ${(Number(inv.gst_rate) / 2).toFixed(2)}%`} value={formatINR(sgst)} />
             <div className="my-1 border-t" />
             <Row label="Invoice total" value={formatINR(inv.total)} bold />
-            {tdsAmount > 0 && (
+            {r.expectedTds > 0 && (
               <>
-                <Row label={`TDS @ ${inv.tds_rate}% (on subtotal)`} value={`− ${formatINR(tdsAmount)}`} />
-                <Row label="Expected payment" value={formatINR(expectedPayment)} bold />
+                <Row label={`Expected TDS @ ${inv.tds_rate}% (on subtotal)`} value={`− ${formatINR(r.expectedTds)}`} />
+                <Row label="Expected payment" value={formatINR(r.expectedPayment)} />
               </>
             )}
-            <Row label="Paid" value={formatINR(inv.amount_paid)} />
-            <Row label="Outstanding" value={formatINR(outstanding)} />
+            {r.actualTds > 0 && <Row label="Actual TDS deducted" value={formatINR(r.actualTds)} />}
+            {r.actualTds > 0 && r.tdsDifference !== 0 && (
+              <Row label="TDS difference" value={formatINR(Math.abs(r.tdsDifference))} />
+            )}
+            <Row label="Payment received" value={formatINR(r.received)} />
+            <Row label="Outstanding" value={formatINR(outstanding)} bold />
           </div>
         </div>
         <div className="border-t p-4 text-sm">
