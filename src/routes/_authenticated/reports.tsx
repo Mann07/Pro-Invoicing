@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { formatINR, formatDate } from "@/lib/format";
+import { payStatus } from "@/lib/tds";
 import { MODULES, type ModuleId } from "@/lib/modules";
 
 export const Route = createFileRoute("/_authenticated/reports")({
@@ -120,7 +121,7 @@ function ModuleReport({ module }: { module: ModuleId }) {
         if (f.to && inv.issue_date > f.to) return false;
         if (f.month !== "all" && new Date(inv.issue_date).getMonth() !== Number(f.month)) return false;
         if (f.year && String(new Date(inv.issue_date).getFullYear()) !== f.year.trim()) return false;
-        if (f.status !== "all" && inv.status !== f.status) return false;
+        if (f.status !== "all" && payStatus(inv) !== f.status) return false;
         if (f.minAmount && Number(inv.total) < Number(f.minAmount)) return false;
         if (f.maxAmount && Number(inv.total) > Number(f.maxAmount)) return false;
         if (f.hsn && !((inv.line_items as any[]) ?? []).some((li) => inc(li?.hsn_sac, f.hsn))) return false;
@@ -161,7 +162,7 @@ function ModuleReport({ module }: { module: ModuleId }) {
       "TDS Difference": +(actualTdsOf(inv) - Number(inv.tds_amount ?? 0)).toFixed(2),
       "Paid": Number(inv.amount_paid),
       "Outstanding": Math.max(0, Number(inv.total) - Number(inv.amount_paid) - actualTdsOf(inv)),
-      "Status": inv.status,
+      "Status": payStatus(inv),
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -199,8 +200,7 @@ function ModuleReport({ module }: { module: ModuleId }) {
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="partial">Partially paid</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -258,7 +258,7 @@ function ModuleReport({ module }: { module: ModuleId }) {
                   <td className="px-4 py-2 text-right">{formatINR(actualTdsOf(inv))}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.amount_paid)}</td>
                   <td className="px-4 py-2 text-right">{formatINR(Math.max(0, Number(inv.total) - Number(inv.amount_paid) - actualTdsOf(inv)))}</td>
-                  <td className="px-4 py-2 capitalize">{inv.status}</td>
+                  <td className="px-4 py-2 capitalize">{payStatus(inv)}</td>
                 </tr>
               ))}
             </tbody>

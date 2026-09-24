@@ -322,14 +322,11 @@ async function recalcInvoice(sb: any, invoiceId: string) {
   if (!inv) throw new Error("Invoice not found");
   const { data: pays } = await sb.from("invoice_payments").select("amount, tds_amount").eq("invoice_id", invoiceId);
   const r = reconcile(inv, (pays ?? []) as any[]);
+  // Payment status is manual — payments only update financial figures.
   const patch: any = { amount_paid: r.received };
-  if (inv.status !== "cancelled") {
-    patch.status = r.status;
-    patch.finalized_at = r.status === "paid" ? (inv.finalized_at ?? new Date().toISOString()) : null;
-  }
   const { error } = await sb.from("invoices").update(patch).eq("id", invoiceId);
   if (error) throw new Error(error.message);
-  return { ok: true, status: patch.status ?? inv.status, amount_paid: r.received, outstanding: r.outstanding, actual_tds: r.actualTds };
+  return { ok: true, status: inv.status, amount_paid: r.received, outstanding: r.outstanding, actual_tds: r.actualTds };
 }
 
 export const addPayment = createServerFn({ method: "POST" })
@@ -393,6 +390,21 @@ export const deletePayment = createServerFn({ method: "POST" })
     return await recalcInvoice(sb, pay.invoice_id);
   });
 
+
+export const setPaymentStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ invoice_id: z.string().uuid(), status: z.enum(["paid", "unpaid"]) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const { error } = await sb
+      .from("invoices")
+      .update({ status: data.status === "paid" ? "paid" : "pending" })
+      .eq("id", data.invoice_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
 
 /* ------------------------------------------------------------------ */
 /* Cancel invoice (reserves the number)                                */
