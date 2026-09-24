@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowUpDown, Pencil, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { payStatus, payStatusColors } from "@/lib/tds";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,9 +88,8 @@ function DealerDetail() {
       paid,
       gst,
       outstanding: active.reduce((s, i) => s + outstandingOf(i), 0),
-      paidCount: active.filter((i) => i.status === "paid").length,
-      pendingCount: active.filter((i) => i.status === "pending" || i.status === "draft").length,
-      partialCount: active.filter((i) => i.status === "partial").length,
+      paidCount: active.filter((i) => payStatus(i) === "paid").length,
+      pendingCount: active.filter((i) => payStatus(i) === "unpaid").length,
       lastInvoiceDate: active.map((i) => i.issue_date).sort().at(-1) ?? null,
       tds,
       actualTds,
@@ -104,7 +104,7 @@ function DealerDetail() {
     const list = (invoices as any[]).filter(
       (i) =>
         !term ||
-        [i.invoice_number, i.issue_date, i.status, i.notes, describe(i), String(i.total)]
+        [i.invoice_number, i.issue_date, payStatus(i), i.notes, describe(i), String(i.total)]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
@@ -193,8 +193,7 @@ function DealerDetail() {
           <Stat label="Total paid" value={formatINR(stats.paid)} />
           <Stat label="Total outstanding" value={formatINR(stats.outstanding)} />
           <Stat label="Paid invoices" value={String(stats.paidCount)} />
-          <Stat label="Pending invoices" value={String(stats.pendingCount)} />
-          <Stat label="Partially paid" value={String(stats.partialCount)} />
+          <Stat label="Unpaid invoices" value={String(stats.pendingCount)} />
           <Stat label="Last invoice date" value={stats.lastInvoiceDate ? formatDate(stats.lastInvoiceDate) : "—"} />
           <Stat label="Last payment date" value={lastPaymentDate ? formatDate(lastPaymentDate) : "—"} />
           <Stat label="Total GST" value={formatINR(stats.gst)} />
@@ -249,7 +248,7 @@ function DealerDetail() {
                     <td className="px-4 py-2">{formatDate(inv.issue_date)}</td>
                     <td className="px-4 py-2 max-w-xs truncate">{describe(inv)}</td>
                     <td className="px-4 py-2 text-right">{formatINR(inv.total)}</td>
-                    <td className="px-4 py-2"><Badge className={statusColors[inv.status] ?? ""}>{inv.status}</Badge></td>
+                    <td className="px-4 py-2"><Badge className={payStatusColors[payStatus(inv)]}>{payStatus(inv)}</Badge></td>
                     <td className="px-4 py-2 text-right">{formatINR(inv.amount_paid)}</td>
                     <td className="px-4 py-2 text-right">{formatINR(outstandingOf(inv))}</td>
                     <td className="px-4 py-2 text-muted-foreground">{inv.notes || "—"}</td>

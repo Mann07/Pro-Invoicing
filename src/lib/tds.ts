@@ -59,3 +59,15 @@ export function reconcile(inv: any, payments?: PaymentLike[] | null) {
     status,
   };
 }
+
+/** Manual payment status set by the user. Legacy values (pending/partial/draft) read as "unpaid". */
+export type PayStatus = "paid" | "unpaid" | "cancelled";
+export function payStatus(inv: any): PayStatus {
+  if (inv?.status === "cancelled") return "cancelled";
+  return inv?.status === "paid" ? "paid" : "unpaid";
+}
+export const payStatusColors: Record<PayStatus, string> = {
+  paid: "bg-success text-success-foreground",
+  unpaid: "bg-destructive text-destructive-foreground",
+  cancelled: "bg-muted text-muted-foreground line-through",
+};

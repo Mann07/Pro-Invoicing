@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { payStatus, payStatusColors } from "@/lib/tds";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -116,7 +117,7 @@ export function InvoiceListSection({
                   <td className="px-4 py-2 text-right">{formatINR(inv.total)}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.amount_paid)}</td>
                   <td className="px-4 py-2">
-                    <Badge className={statusColors[inv.status] ?? ""}>{inv.status}</Badge>
+                    <Badge className={payStatusColors[payStatus(inv)]}>{payStatus(inv)}</Badge>
                   </td>
                 </tr>
               ))}

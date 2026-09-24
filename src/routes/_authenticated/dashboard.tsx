@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { formatINR, formatDate } from "@/lib/format";
 import { MODULES, type ModuleId } from "@/lib/modules";
+import { payStatus } from "@/lib/tds";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -43,9 +44,8 @@ function useModuleTotals(module: ModuleId) {
         outstanding: active.reduce((s, r) => s + Math.max(0, expected(r) - Number(r.amount_paid)), 0),
         gst: active.reduce((s, r) => s + Number(r.gst_amount ?? 0), 0),
         actualTds,
-        pending: active.filter((r) => r.status === "pending" || r.status === "draft").length,
-        partial: active.filter((r) => r.status === "partial").length,
-        paid: active.filter((r) => r.status === "paid").length,
+        pending: active.filter((r) => payStatus(r) === "unpaid").length,
+        paid: active.filter((r) => payStatus(r) === "paid").length,
         recent: rows.slice(0, 10),
       };
     },
@@ -90,9 +90,8 @@ function ModuleSummary({ module }: { module: ModuleId }) {
         <Stat label="Total GST" value={formatINR(data.gst)} />
         <Stat label="Total TDS (actual)" value={formatINR(data.actualTds)} />
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        <Stat label="Pending invoices" value={String(data.pending)} />
-        <Stat label="Partially paid" value={String(data.partial)} />
+      <div className="grid gap-3 md:grid-cols-2">
+        <Stat label="Unpaid invoices" value={String(data.pending)} />
         <Stat label="Paid invoices" value={String(data.paid)} />
       </div>
 
@@ -127,7 +126,7 @@ function ModuleSummary({ module }: { module: ModuleId }) {
                   </td>
                   <td className="px-4 py-2">{formatDate(inv.issue_date)}</td>
                   <td className="px-4 py-2 text-right">{formatINR(inv.total)}</td>
-                  <td className="px-4 py-2 capitalize">{inv.status}</td>
+                  <td className="px-4 py-2 capitalize">{payStatus(inv)}</td>
                 </tr>
               ))}
             </tbody>

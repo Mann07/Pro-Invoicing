@@ -3,28 +3,21 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, FileText, FileDown, Ban, Lock, RefreshCw } from "lucide-react";
+import { ArrowLeft, FileText, FileDown, Ban, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { addPayment, updatePayment, deletePayment, cancelInvoice, getInvoiceDownloadUrl, ensureInvoicePdf, deleteInvoicePermanently } from "@/lib/invoice.functions";
+import { addPayment, updatePayment, deletePayment, cancelInvoice, setPaymentStatus, getInvoiceDownloadUrl, ensureInvoicePdf, deleteInvoicePermanently } from "@/lib/invoice.functions";
 import { formatINR, formatDate, todayISO, toIndianWordsINR } from "@/lib/format";
-import { gstSplit, reconcile } from "@/lib/tds";
+import { gstSplit, reconcile, payStatus, payStatusColors } from "@/lib/tds";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/invoices/$id")({
   component: InvoiceDetail,
 });
-
-const statusColors: Record<string, string> = {
-  paid: "bg-success text-success-foreground",
-  partial: "bg-warning text-warning-foreground",
-  pending: "bg-destructive text-destructive-foreground",
-  draft: "bg-muted text-muted-foreground",
-  cancelled: "bg-muted text-muted-foreground",
-};
 
 function InvoiceDetail() {
   const { id } = useParams({ from: "/_authenticated/invoices/$id" });
@@ -37,6 +30,7 @@ function InvoiceDetail() {
   const editPayFn = useServerFn(updatePayment);
   const delPayFn = useServerFn(deletePayment);
   const deleteFn = useServerFn(deleteInvoicePermanently);
+  const statusFn = useServerFn(setPaymentStatus);
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -72,7 +66,8 @@ function InvoiceDetail() {
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading…</div>;
   if (!inv) return <div className="p-6">Not found. <Link to="/dashboard" className="text-primary underline">Back</Link></div>;
 
-  const locked = inv.status === "paid" || inv.status === "cancelled";
+  const cancelled = inv.status === "cancelled";
+  const ps = payStatus(inv);
   const { cgst, sgst } = gstSplit(inv.gst_amount);
   const r = reconcile(inv, payments as any[]);
   const outstanding = r.outstanding;
@@ -138,7 +133,7 @@ function InvoiceDetail() {
         : await payFn({ data: { invoice_id: id, ...body } });
       toast.success(
         editingId ? "Payment updated" :
-        res.status === "paid" ? "Payment complete — invoice settled in full" : "Payment recorded",
+        "Payment recorded",
       );
       setPay(emptyPay); setEditingId(null);
       refresh();
@@ -170,6 +165,14 @@ function InvoiceDetail() {
   }
 
 
+  async function changeStatus(v: string) {
+    try {
+      await statusFn({ data: { invoice_id: id, status: v as "paid" | "unpaid" } });
+      toast.success(`Marked ${v === "paid" ? "Paid" : "Unpaid"}`);
+      refresh();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
   async function cancel() {
     if (!confirm("Cancel this invoice? The number stays reserved.")) return;
     try {
@@ -200,8 +203,7 @@ function InvoiceDetail() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{inv.invoice_number}</h1>
-              <Badge className={statusColors[inv.status]}>{inv.status}</Badge>
-              {locked && <Badge variant="outline"><Lock className="mr-1 h-3 w-3" /> Locked</Badge>}
+              <Badge className={payStatusColors[ps]}>{ps}</Badge>
               <Badge variant="outline" className="capitalize">{inv.module}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">Issued {formatDate(inv.issue_date)}</p>
@@ -215,7 +217,16 @@ function InvoiceDetail() {
               : <FileDown className="mr-2 h-4 w-4" />}
             Download PDF
           </Button>
-          {inv.pdf_status === "ready" && !locked && (
+          {!cancelled && (
+            <Select value={ps} onValueChange={changeStatus}>
+              <SelectTrigger className="w-[130px]" aria-label="Payment status"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="unpaid">Unpaid</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          {inv.pdf_status === "ready" && (
             <Button variant="outline" onClick={() => downloadPdf(true)} disabled={regenBusy}>
               <RefreshCw className={`mr-2 h-4 w-4 ${regenBusy ? "animate-spin" : ""}`} /> Regenerate
             </Button>
@@ -309,7 +320,7 @@ function InvoiceDetail() {
         </div>
       </div>
 
-      {!locked && (
+      {!cancelled && (
         <div className="rounded-lg border bg-card p-5">
           <h2 className="font-semibold">{editingId ? "Edit payment" : "Record payment"}</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-4">
@@ -321,7 +332,7 @@ function InvoiceDetail() {
             <div className="space-y-2"><Label>UTR / Ref</Label><Input value={pay.utr} onChange={(e) => setPay((p) => ({ ...p, utr: e.target.value }))} /></div>
             <div className="space-y-2 md:col-span-2"><Label>Notes</Label><Input value={pay.notes} onChange={(e) => setPay((p) => ({ ...p, notes: e.target.value }))} /></div>
           </div>
-          <div className="mt-3 text-xs text-muted-foreground">Outstanding: {formatINR(outstanding)}. Settlement = payment received + actual TDS. When settled in full the invoice locks automatically.</div>
+          <div className="mt-3 text-xs text-muted-foreground">Outstanding: {formatINR(outstanding)}. Settlement = payment received + actual TDS. Payment status is set manually above.</div>
           <div className="mt-3 flex justify-end gap-2">
             {editingId && <Button variant="outline" onClick={() => { setEditingId(null); setPay(emptyPay); }}>Cancel edit</Button>}
             <Button disabled={busy} onClick={savePayment}>{editingId ? "Save changes" : "Record payment"}</Button>
@@ -346,7 +357,7 @@ function InvoiceDetail() {
                   <td className="text-muted-foreground">{p.utr || "—"}</td>
                   <td className="text-muted-foreground">{p.notes || "—"}</td>
                   <td className="text-right whitespace-nowrap">
-                    {!locked && (
+                    {!cancelled && (
                       <>
                         <Button size="sm" variant="ghost" onClick={() => startEdit(p)}>Edit</Button>
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => removePayment(p.id)}>Delete</Button>
@@ -359,7 +370,7 @@ function InvoiceDetail() {
           </table>}
       </div>
 
-      {!locked && (
+      {!cancelled && (
         <div className="rounded-lg border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Cancel invoice</h2>
           <p className="text-sm text-muted-foreground">Cancelling keeps the invoice number reserved but excludes it from revenue/outstanding.</p>
