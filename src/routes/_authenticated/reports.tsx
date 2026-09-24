@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { formatINR, formatDate } from "@/lib/format";
+import { payStatus } from "@/lib/tds";
 import { MODULES, type ModuleId } from "@/lib/modules";
 
 export const Route = createFileRoute("/_authenticated/reports")({
